@@ -1,25 +1,30 @@
 {
   "expo": {
-    "name": "controle-aluno-mobile",
-    "slug": "controle-aluno-mobile",
+    "name": "Aula em Dia",
+    "slug": "controle-aluno-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.mateuskraiewski.aulaemdia",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.mateuskraiewski.aulaemdia",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#243d34",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-system-ui"
+    ]
   }
 }
