@@ -1,5 +1,13 @@
 # Aula em Dia — app móvel
 
+## Progresso de entrega
+
+**Estimativa ponderada: 36%.** A barra é clicável: cada segmento abre a etapa, as evidências e o que falta.
+
+[██████████](docs/progress.md#product-and-offline-architecture-10) [█████████████████░░░░░░░░](docs/progress.md#local-storage-and-repositories-25) [█████████░░░░░░░░░░░░░░░░░░░░░░░░░](docs/progress.md#student-app-35) [░░░░░░░░░░░░░░░░░░](docs/progress.md#on-device-quality-20) [░░░░░░░░░░](docs/progress.md#installation-and-cloud-10)
+
+> Número aproximado e ponderado do escopo, não prontidão de publicação. Cálculo: docs/progress.md.
+
 App Android e iPhone para organizar aulas e o histórico escolar com funcionamento offline. O armazenamento local é a fonte de verdade nesta fase; não há cadastro, telemetria ou sincronização com servidor.
 
 ## Requisitos e execução
