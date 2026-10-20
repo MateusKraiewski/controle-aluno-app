@@ -142,7 +142,9 @@ describe('conflicts', () => {
 describe('search helpers', () => {
   it('escapes LIKE wildcards', () => {
     assert.equal(escapeLike('50%_a\\b'), '50\\%\\_a\\\\b');
-    assert.equal(toSearchPattern('  frações   100% '), '%frações 100\\%%');
+    assert.equal(toSearchPattern('  frações   100% '), '%fracoes 100\\%%');
+    assert.equal(toSearchPattern('FÍSICA'), '%fisica%');
+    assert.equal(toSearchPattern('Ação_1'), '%acao\\_1%');
     assert.equal(toSearchPattern('   '), null);
     assert.equal(toSearchPattern('x'.repeat(500))?.length, 102);
   });

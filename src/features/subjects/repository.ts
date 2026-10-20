@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { normalizeForSearch } from '../../lib/text';
 
 export type Subject = { id: number; name: string; archived: boolean; lessonCount: number };
 
@@ -22,7 +23,7 @@ export async function renameSubject(db: SQLiteDatabase, id: number, name: string
   await db.withTransactionAsync(async () => {
     const clash = await db.getFirstAsync<{ id: number }>('SELECT id FROM subjects WHERE name = ? AND id <> ?', name, id);
     if (clash) { outcome = 'duplicate'; return; }
-    await db.runAsync('UPDATE subjects SET name = ? WHERE id = ?', name, id);
+    await db.runAsync('UPDATE subjects SET name = ?, search_name = ? WHERE id = ?', name, normalizeForSearch(name), id);
   });
   return outcome;
 }

@@ -1,12 +1,19 @@
 // Schema migrations, kept free of expo imports so they can be exercised against
-// Node's built-in SQLite in tests. Every step is additive: no DROP, no data rewrite.
+// Node's built-in SQLite in tests. Every step is additive: no DROP; v3 only fills new
+// derived columns.
+import { lessonSearchText, normalizeForSearch } from '../lib/text';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
+
+/** Rows per backfill page, so a long history is never read into memory at once. */
+const BACKFILL_PAGE = 500;
 
 /** Minimal surface of expo-sqlite's SQLiteDatabase used by the migrator. */
 export type MigrationDatabase = {
   execAsync(source: string): Promise<void>;
-  getFirstAsync<T>(source: string): Promise<T | null>;
+  getFirstAsync<T>(source: string, ...params: (string | number | null)[]): Promise<T | null>;
+  getAllAsync<T>(source: string, ...params: (string | number | null)[]): Promise<T[]>;
+  runAsync(source: string, ...params: (string | number | null)[]): Promise<unknown>;
   withTransactionAsync(task: () => Promise<void>): Promise<void>;
 };
 
@@ -55,6 +62,36 @@ const V2 = `
   CREATE INDEX lessons_series_date_idx ON lessons(series_id, local_date) WHERE series_id IS NOT NULL;
 `;
 
+// v3: accent/case-insensitive search keys computed by the app (SQLite has no unaccent).
+// Nullable ADD COLUMN, then backfilled below; existing values are not rewritten.
+const V3 = `
+  ALTER TABLE subjects ADD COLUMN search_name TEXT;
+  ALTER TABLE lessons ADD COLUMN search_text TEXT;
+`;
+
+/** Fills the v3 search columns in id-ordered pages inside the migration transaction. */
+async function backfillSearchColumns(db: MigrationDatabase): Promise<void> {
+  for (let after = 0; ;) {
+    const subjects = await db.getAllAsync<{ id: number; name: string }>(
+      'SELECT id, name FROM subjects WHERE id > ? ORDER BY id LIMIT ?', after, BACKFILL_PAGE);
+    for (const row of subjects) {
+      await db.runAsync('UPDATE subjects SET search_name = ? WHERE id = ?', normalizeForSearch(row.name), row.id);
+    }
+    if (subjects.length < BACKFILL_PAGE) break;
+    after = subjects[subjects.length - 1].id;
+  }
+  for (let after = 0; ;) {
+    const lessons = await db.getAllAsync<{ id: number; teacher_name: string | null; planned_content: string | null; studied_content: string | null }>(
+      'SELECT id, teacher_name, planned_content, studied_content FROM lessons WHERE id > ? ORDER BY id LIMIT ?', after, BACKFILL_PAGE);
+    for (const row of lessons) {
+      const searchText = lessonSearchText({ teacher: row.teacher_name, plannedContent: row.planned_content, studiedContent: row.studied_content });
+      await db.runAsync('UPDATE lessons SET search_text = ? WHERE id = ?', searchText, row.id);
+    }
+    if (lessons.length < BACKFILL_PAGE) break;
+    after = lessons[lessons.length - 1].id;
+  }
+}
+
 export async function readSchemaVersion(db: MigrationDatabase): Promise<number> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   if (!row) throw new Error('Não foi possível ler a versão da base local');
@@ -69,6 +106,10 @@ export async function migrate(db: MigrationDatabase): Promise<number> {
   await db.withTransactionAsync(async () => {
     if (current < 1) await db.execAsync(V1);
     if (current < 2) await db.execAsync(V2);
+    if (current < 3) {
+      await db.execAsync(V3);
+      await backfillSearchColumns(db);
+    }
     await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   });
   return SCHEMA_VERSION;

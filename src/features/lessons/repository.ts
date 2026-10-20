@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { lessonSearchText, normalizeForSearch } from '../../lib/text';
 import { addDays, toSearchPattern } from './domain';
 import type { TimeSlot } from './domain';
 import type { Attendance, HistoryQuery, Lesson, LessonStatus, LessonUpdate, NewLesson, NewSeries, Scope } from './types';
@@ -73,7 +74,8 @@ export async function listTimeSlots(db: SQLiteDatabase, from: string, toInclusiv
 /** Returns the subject id, creating it or un-archiving it when it is used again. */
 async function resolveSubject(db: SQLiteDatabase, name: string, now: number): Promise<number> {
   const row = await db.getFirstAsync<{ id: number }>(
-    'INSERT INTO subjects (name, created_at) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET archived_at = NULL RETURNING id', name, now);
+    'INSERT INTO subjects (name, search_name, created_at) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET archived_at = NULL RETURNING id',
+    name, normalizeForSearch(name), now);
   if (!row) throw new Error('Could not resolve subject');
   return row.id;
 }
@@ -84,8 +86,9 @@ export async function createLesson(db: SQLiteDatabase, input: NewLesson): Promis
     const now = Date.now();
     const subjectId = await resolveSubject(db, input.subject, now);
     const result = await db.runAsync(
-      'INSERT INTO lessons (subject_id, teacher_name, local_date, start_minute, duration_minutes, planned_content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      subjectId, input.teacher, input.localDate, input.startMinute, input.durationMinutes, input.plannedContent, now, now);
+      'INSERT INTO lessons (subject_id, teacher_name, local_date, start_minute, duration_minutes, planned_content, search_text, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      subjectId, input.teacher, input.localDate, input.startMinute, input.durationMinutes, input.plannedContent,
+      lessonSearchText({ ...input, studiedContent: null }), now, now);
     id = result.lastInsertRowId;
   });
   return id;
@@ -109,12 +112,13 @@ export async function createLessonSeries(db: SQLiteDatabase, input: NewSeries): 
       subjectId, input.frequency, mask, input.localDate, input.endDate, input.startMinute, input.durationMinutes, now);
     seriesId = series.lastInsertRowId;
     const statement = await db.prepareAsync(
-      'INSERT INTO lessons (subject_id, teacher_name, local_date, start_minute, duration_minutes, planned_content, series_id, original_local_date, created_at, updated_at) VALUES ($subject, $teacher, $date, $start, $duration, $planned, $series, $date, $now, $now)');
+      'INSERT INTO lessons (subject_id, teacher_name, local_date, start_minute, duration_minutes, planned_content, search_text, series_id, original_local_date, created_at, updated_at) VALUES ($subject, $teacher, $date, $start, $duration, $planned, $search, $series, $date, $now, $now)');
+    const searchText = lessonSearchText({ ...input, studiedContent: null });
     try {
       for (const date of input.dates) {
         await statement.executeAsync({
           $subject: subjectId, $teacher: input.teacher, $date: date, $start: input.startMinute,
-          $duration: input.durationMinutes, $planned: input.plannedContent, $series: seriesId, $now: now,
+          $duration: input.durationMinutes, $planned: input.plannedContent, $search: searchText, $series: seriesId, $now: now,
         });
       }
     } finally {
@@ -131,9 +135,9 @@ export async function updateLesson(db: SQLiteDatabase, id: number, input: Lesson
     const subjectId = await resolveSubject(db, input.subject, now);
     await db.runAsync(
       `UPDATE lessons SET subject_id = ?, teacher_name = ?, local_date = ?, start_minute = ?, duration_minutes = ?,
-        planned_content = ?, studied_content = ?, updated_at = ? WHERE id = ?`,
+        planned_content = ?, studied_content = ?, search_text = ?, updated_at = ? WHERE id = ?`,
       subjectId, input.teacher, input.localDate, input.startMinute, input.durationMinutes,
-      input.plannedContent, input.studiedContent, now, id);
+      input.plannedContent, input.studiedContent, lessonSearchText(input), now, id);
   });
 }
 
@@ -205,7 +209,8 @@ export async function deleteLessons(db: SQLiteDatabase, id: number, scope: Scope
 
 /**
  * Keyset-paginated history, newest first. Optional filters are bound parameters
- * (`? IS NULL OR …`); search uses LIKE with escaped wildcards.
+ * (`? IS NULL OR …`); search uses LIKE with escaped wildcards over the app-maintained
+ * accent/case-folded columns `subjects.search_name` and `lessons.search_text`.
  */
 export async function listHistoryPage(db: SQLiteDatabase, query: HistoryQuery): Promise<Lesson[]> {
   const limit = clampLimit(query.limit ?? 50, MAX_PAGE);
@@ -216,14 +221,13 @@ export async function listHistoryPage(db: SQLiteDatabase, query: HistoryQuery): 
     FROM lessons l JOIN subjects s ON s.id = l.subject_id
     WHERE l.local_date <= ?
       AND (? IS NULL OR l.subject_id = ?)
-      AND (? IS NULL OR (s.name LIKE ? ESCAPE '\\' OR l.teacher_name LIKE ? ESCAPE '\\'
-        OR l.planned_content LIKE ? ESCAPE '\\' OR l.studied_content LIKE ? ESCAPE '\\'))
+      AND (? IS NULL OR s.search_name LIKE ? ESCAPE '\\' OR l.search_text LIKE ? ESCAPE '\\')
       AND (? IS NULL OR (l.local_date, l.start_minute, l.id) < (?, ?, ?))
     ORDER BY l.local_date DESC, l.start_minute DESC, l.id DESC
     LIMIT ?`,
   query.onOrBefore,
   query.subjectId, query.subjectId,
-  pattern, pattern, pattern, pattern, pattern,
+  pattern, pattern, pattern,
   before ? 1 : null, before?.localDate ?? null, before?.startMinute ?? null, before?.id ?? null,
   limit);
   return rows.map(toLesson);

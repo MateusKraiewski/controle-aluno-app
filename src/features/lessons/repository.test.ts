@@ -150,8 +150,38 @@ describe('history pagination and search', () => {
     assert.equal((await collect({ search: '%', limit: 50 })).flat().length, 1);
     assert.equal((await collect({ search: '_', limit: 50 })).flat().length, 1);
     assert.equal((await collect({ search: "'; DROP TABLE lessons; --", limit: 50 })).flat().length, 0);
-    assert.equal((await collect({ search: 'FÍSICA', limit: 50 })).flat().length, 0); // LIKE folds ASCII case only
+    // Accent- and case-insensitive through the app-maintained search columns.
+    assert.equal((await collect({ search: 'FÍSICA', limit: 50 })).flat().length, 5);
+    assert.equal((await collect({ search: 'fisica', limit: 50 })).flat().length, 5);
+    assert.equal((await collect({ search: 'QUIMICA', limit: 50 })).flat().length, 4);
+    assert.deepEqual((await collect({ search: 'TOPICO 7', limit: 50 })).flat().map((item) => item.localDate), ['2026-10-07']);
     assert.equal((await collect({ search: 'Física', limit: 50 })).flat().length, 5);
+  });
+});
+
+describe('accent-insensitive search keys', () => {
+  it('keeps search columns in sync on create, edit, series and rename', async () => {
+    const search = (term: string) => listHistoryPage(db, { before: null, onOrBefore: '2026-12-31', subjectId: null, search: term, limit: 50 });
+    const id = await createLesson(db, lesson({ subject: 'Educação Física', teacher: 'José Álvares', localDate: '2026-10-01' }));
+    await updateLesson(db, id, { ...lesson({ subject: 'Educação Física', teacher: 'José Álvares', localDate: '2026-10-01' }), studiedContent: 'Revisão de ÓTICA' });
+    assert.equal((await search('EDUCACAO')).length, 1);
+    assert.equal((await search('jose alvares')).length, 1);
+    assert.equal((await search('otica')).length, 1);
+    assert.equal((await search('revisão')).length, 1);
+    assert.equal((await search('xyz')).length, 0);
+
+    const generated = generateOccurrences({ startDate: '2026-10-05', endDate: '2026-10-12', weekdays: [1], frequency: 'weekly' });
+    if (!generated.ok) throw new Error(generated.error);
+    await createLessonSeries(db, { ...lesson({ subject: 'Inglês', plannedContent: 'Pronúncia', localDate: '2026-10-05' }), frequency: 'weekly', weekdays: [1], endDate: '2026-10-12', dates: generated.value.dates });
+    assert.equal((await search('PRONUNCIA')).length, 2);
+    assert.equal((await search('ingles')).length, 2);
+
+    const ingles = (await listSubjects(db, { includeArchived: true })).find((item) => item.name === 'Inglês');
+    assert.ok(ingles);
+    await renameSubject(db, ingles.id, 'Idiomas Estrangeiros');
+    assert.equal((await search('IDIOMAS')).length, 2);
+    assert.equal((await search('ingles')).length, 0);
+    assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lessons WHERE search_text IS NULL').get()?.n, 0);
   });
 });
 

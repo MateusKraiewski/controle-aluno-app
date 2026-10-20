@@ -1,6 +1,7 @@
 // Pure lesson rules. No React, no SQLite, no platform APIs: this module runs under
 // `node --test` and in the app. Dates are civil local dates (YYYY-MM-DD) and times
 // are minutes since midnight, matching the SQLite schema.
+import { normalizeForSearch } from '../../lib/text';
 
 export const MIN_DURATION = 5;
 export const MAX_DURATION = 480;
@@ -214,10 +215,13 @@ export function escapeLike(text: string): string {
   return text.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
-/** Normalised, bounded search term, or null when there is nothing to search. */
+/**
+ * Bounded search term folded like the stored `search_*` columns (no accents, lower
+ * case), escaped for `LIKE ? ESCAPE '\'`; null when there is nothing to search.
+ */
 export function toSearchPattern(text: string): string | null {
-  const trimmed = text.trim().replace(/\s+/g, ' ').slice(0, MAX_SEARCH_LENGTH);
-  return trimmed ? `%${escapeLike(trimmed)}%` : null;
+  const folded = normalizeForSearch(text.slice(0, MAX_SEARCH_LENGTH * 2)).slice(0, MAX_SEARCH_LENGTH);
+  return folded ? `%${escapeLike(folded)}%` : null;
 }
 
 export function formatTemplate(template: string, values: Record<string, string | number>): string {
