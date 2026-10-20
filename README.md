@@ -2,9 +2,9 @@
 
 ## Progresso de entrega
 
-**Estimativa ponderada: 53%.** A barra é clicável: cada segmento abre a etapa, as evidências e o que falta.
+**Estimativa ponderada: 59%.** A barra é clicável: cada segmento abre a etapa, as evidências e o que falta.
 
-[██████████](docs/progress.md#product-and-offline-architecture-10) [████████████████████░░░░░](docs/progress.md#local-storage-and-repositories-25) [█████████████████████░░░░░░░░░░░░░░](docs/progress.md#student-app-35) [██░░░░░░░░░░░░░░░░░░](docs/progress.md#on-device-quality-20) [░░░░░░░░░░](docs/progress.md#installation-and-cloud-10)
+[██████████](docs/progress.md#product-and-offline-architecture-10) [███████████████████████░░](docs/progress.md#local-storage-and-repositories-25) [████████████████████████░░░░░░░░░░░](docs/progress.md#student-app-35) [██░░░░░░░░░░░░░░░░░░](docs/progress.md#on-device-quality-20) [░░░░░░░░░░](docs/progress.md#installation-and-cloud-10)
 
 > Número aproximado e ponderado do escopo, não prontidão de publicação. Cálculo: docs/progress.md.
 
@@ -21,7 +21,7 @@ npm install
 npx expo start
 ```
 
-Use `a` para abrir num emulador Android, ou leia o QR com Expo Go. A app abre na agenda semanal, com separadores para histórico e matérias; a base SQLite é local ao dispositivo. Limpar os dados/reinstalar a aplicação pode apagar o histórico se não houver uma cópia de segurança do dispositivo.
+Use `a` para abrir num emulador Android, ou leia o QR com Expo Go. A app abre na agenda semanal, com separadores para histórico e matérias; a base SQLite é local ao dispositivo. Limpar os dados/reinstalar a aplicação apaga o histórico; exporte antes uma cópia de segurança em Definições → Os seus dados.
 
 ## Produto e decisões
 
@@ -41,18 +41,21 @@ Implementado no código e coberto por TypeScript, testes automáticos em Node e 
 - Excluir aula com confirmação explícita; numa repetição, escolher “só esta” ou “esta e as seguintes”.
 - Repetição semanal ou quinzenal na criação: dias da semana + data final (até 1 ano, máximo 300 aulas), gravada numa única transação e ligada a `lesson_series`.
 - Aviso de sobreposição no mesmo dia antes de guardar, com opção de guardar mesmo assim.
-- Histórico (aulas até hoje) com paginação por cursor, “Carregar mais”, filtro por matéria e pesquisa local.
+- Histórico (aulas até hoje) com paginação por cursor, “Carregar mais”, filtro por matéria e pesquisa local que ignora acentos e maiúsculas (“FISICA” encontra “Física”).
 - Matérias: renomear (nome único sem diferenciar maiúsculas) e arquivar/reativar sem apagar aulas.
 - Português do Brasil/Portugal, inglês, espanhol e tema sistema/claro/escuro, guardados localmente.
-- SQLite com esquema v2 (migração aditiva da v1 testada), transações, WAL, índices e limites de consulta.
+- Definições → Os seus dados: exportar cópia de segurança JSON versionada pela folha de partilha do sistema; restaurar a partir de JSON colado ou ficheiro escolhido, com validação estrita, pré-visualização de contagens, confirmação e substituição total numa única transação (ou nada muda); apagar todos os dados com confirmação em dois passos.
+- SQLite com esquema v3 (migrações aditivas v1→v2→v3 testadas, incluindo backfill das colunas de pesquisa), transações, WAL, índices e limites de consulta.
 
-Ainda não implementado: editar todas as ocorrências de uma série ou mudar a regra, feriados/exceções automáticas, calendário mensal, cor/ordem de matérias, apontamentos privados e tarefas, filtro por período, exportação/restauro e eliminação de todos os dados. Detalhes em `docs/offline-first.md` e `docs/progress.md`.
+Ainda não implementado: editar todas as ocorrências de uma série ou mudar a regra, feriados/exceções automáticas, calendário mensal, cor/ordem de matérias, apontamentos privados e tarefas, filtro por período, cifra local e cópia de segurança automática. Detalhes em `docs/offline-first.md` e `docs/progress.md`.
 
 ## Testes
 
 ```sh
 npm run typecheck   # app + ficheiros de teste
-npm test            # node --test: regras de domínio, migrações e repositórios em node:sqlite
+npm test            # node --test: domínio, pesquisa, migrações, repositórios e cópia de segurança em node:sqlite
+npx expo-doctor
+npx expo export --platform android --platform ios --output-dir <pasta-temporária>
 ```
 
 O app não sincroniza dados nem permite confirmação independente do professor. A lista completa de limites e decisões está em `docs/offline-first.md`.

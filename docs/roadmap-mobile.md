@@ -14,8 +14,8 @@
 - ◐ Semana navegável, lista diária, calendário mensal e avisos de sobreposição que deixam a decisão explícita — semana navegável agrupada por dia e aviso de sobreposição feitos; calendário mensal por fazer.
 - ◐ Recorrências semanais/quinzenais, exceções por feriado, e edição de uma/esta e próximas/todas — criação semanal/quinzenal, edição “só esta”, cancelar/excluir “esta e as seguintes” feitos; editar todas/seguintes, mudar a regra e feriados por fazer.
 - ◐ Registo posterior de conteúdo realmente estudado, apontamentos privados, tarefa/revisão e estado da aula, separados do plano — conteúdo estudado e estado (planeada/cancelada) feitos; apontamentos e tarefas por fazer.
-- ◐ Histórico com filtro por matéria/período, busca local e paginação por cursor composto — matéria, busca e cursor feitos; período por fazer.
-- ○ Exportar/restaurar cópia local e eliminar os dados por iniciativa do aluno.
+- ◐ Histórico com filtro por matéria/período, busca local e paginação por cursor composto — matéria, busca local sem distinção de acentos/maiúsculas e cursor feitos; período por fazer.
+- ✅ Exportar/restaurar cópia local (JSON versionado, validação estrita, substituição total numa transação) e eliminar todos os dados por iniciativa do aluno (confirmação em dois passos) — falta ensaio em aparelho.
 
 ## Fase 2 — confiabilidade e acessibilidade
 
