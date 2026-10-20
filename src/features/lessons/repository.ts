@@ -339,6 +339,32 @@ export async function deleteLessons(db: SQLiteDatabase, id: number, scope: Scope
   return changes;
 }
 
+// A holiday/break cancels lessons that are still planned and have nothing recorded
+// (no attendance, no studied content). Inclusive date range, bound parameters.
+const BREAK_TARGETS = `local_date >= ? AND local_date <= ? AND status = 'planned' AND attendance = 'unmarked' AND studied_content IS NULL`;
+
+/** How many lessons a holiday/break over [from, to] would cancel (preview). */
+export async function countBreakTargets(db: SQLiteDatabase, from: string, to: string): Promise<number> {
+  const row = await db.getFirstAsync<{ total: number }>(`SELECT COUNT(*) AS total FROM lessons WHERE ${BREAK_TARGETS}`, from, to);
+  return row?.total ?? 0;
+}
+
+/**
+ * Holiday/break: cancels every planned, unrecorded lesson in [from, to] with the
+ * given reason, in one statement inside one transaction. Cancelled is not an absence;
+ * each lesson can be reactivated later. Returns how many were cancelled.
+ */
+export async function cancelLessonsInRange(db: SQLiteDatabase, from: string, to: string, reason: string | null): Promise<number> {
+  let changes = 0;
+  await db.withTransactionAsync(async () => {
+    const result = await db.runAsync(
+      `UPDATE lessons SET status = 'cancelled', cancel_reason = ?, updated_at = ? WHERE ${BREAK_TARGETS}`,
+      reason, Date.now(), from, to);
+    changes = result.changes;
+  });
+  return changes;
+}
+
 /**
  * Keyset-paginated history, newest first. Optional filters are bound parameters
  * (`? IS NULL OR …`); search uses LIKE with escaped wildcards over the app-maintained

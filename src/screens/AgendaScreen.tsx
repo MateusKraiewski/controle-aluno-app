@@ -9,6 +9,7 @@ import { listLessonsInRange, updateAttendance } from '../features/lessons/reposi
 import type { Attendance, Lesson } from '../features/lessons/types';
 import { prettyDate, weekLabel } from '../lib/format';
 import { useApp } from '../theme/AppContext';
+import { BreakModal } from './BreakModal';
 
 type AgendaScreenProps = {
   revision: number;
@@ -27,6 +28,7 @@ export function AgendaScreen({ revision, onOpen, onAdd, onChanged }: AgendaScree
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [breakStart, setBreakStart] = useState<string | null>(null);
   const loadError = t.loadError;
 
   useEffect(() => {
@@ -78,7 +80,9 @@ export function AgendaScreen({ revision, onOpen, onAdd, onChanged }: AgendaScree
         <Chip label="‹" accessibilityLabel={t.previousWeek} onPress={() => setWeekStart((week) => addDays(week, -7))} />
         <Chip label={t.today} selected={isCurrentWeek} onPress={() => setWeekStart(currentWeek)} />
         <Chip label="›" accessibilityLabel={t.nextWeek} onPress={() => setWeekStart((week) => addDays(week, 7))} />
+        <Chip label={t.breakOpen} onPress={() => setBreakStart(addDate)} />
       </View>
+      <BreakModal startDate={breakStart} onClose={() => setBreakStart(null)} onChanged={onChanged} />
       <ErrorText message={error} />
       {loading && lessons.length === 0 ? <ActivityIndicator color={palette.accent} style={{ marginTop: 32 }} /> : lessons.length === 0 ? (
         <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>

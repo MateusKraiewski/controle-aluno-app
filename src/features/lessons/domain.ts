@@ -188,6 +188,32 @@ export function generateOccurrences(input: RecurrenceInput): Result<{ dates: str
   return { ok: true, value: { dates, truncated } };
 }
 
+/** Cancellation reasons (lessons and breaks) keep at most this many characters. */
+export const MAX_REASON_LENGTH = MAX_NAME_LENGTH * 2;
+
+export type DateRangeError = 'fromInvalid' | 'toInvalid' | 'rangeReversed' | 'rangeTooLong';
+
+/**
+ * Validates an inclusive date range typed by the student. With `required`, both ends
+ * must be given; otherwise an empty side means "open" (null). `maxDays` limits the
+ * span between two given ends.
+ */
+export function validateDateRange(
+  fromInput: string, toInput: string, options: { required: boolean; maxDays?: number },
+): Result<{ from: string | null; to: string | null }, DateRangeError> {
+  const fromText = fromInput.trim();
+  const toText = toInput.trim();
+  if ((fromText || options.required) && !isValidLocalDate(fromText)) return { ok: false, error: 'fromInvalid' };
+  if ((toText || options.required) && !isValidLocalDate(toText)) return { ok: false, error: 'toInvalid' };
+  const from = fromText || null;
+  const to = toText || null;
+  if (from && to) {
+    if (to < from) return { ok: false, error: 'rangeReversed' };
+    if (options.maxDays !== undefined && daysBetween(from, to) > options.maxDays) return { ok: false, error: 'rangeTooLong' };
+  }
+  return { ok: true, value: { from, to } };
+}
+
 /** Weekday indexes (0 = Sunday … 6 = Saturday) stored in a series mask. */
 export function maskToWeekdays(mask: number): number[] {
   return [0, 1, 2, 3, 4, 5, 6].filter((day) => (mask & (1 << day)) !== 0);

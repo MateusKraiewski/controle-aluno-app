@@ -19,7 +19,7 @@ export function createStyles(colors: Palette) {
     heroBottom: { marginTop: 22, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
     eyebrowLight: { color: '#c9d9ce', fontSize: 10, fontWeight: '700', letterSpacing: 1.7 },
     heroCount: { color: '#fff', fontSize: 18, fontWeight: '600', marginTop: 5 },
-    weekNav: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    weekNav: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
     weekNavButton: { minWidth: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#ffffff1a', paddingHorizontal: 12 },
     weekNavText: { color: '#fff', fontSize: 13, fontWeight: '800' },
     content: { flex: 1, paddingHorizontal: 21, paddingTop: 20 },
