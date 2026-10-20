@@ -88,6 +88,7 @@ function AppShell() {
           onClose={() => setShowSettings(false)}
           onLanguage={(next) => void changeLanguage(next)}
           onTheme={(next) => void changeTheme(next)}
+          onDataChanged={changed}
         />
       </SafeAreaView>
     </AppContextProvider>

@@ -24,7 +24,8 @@
     },
     "plugins": [
       "expo-sqlite",
-      "expo-system-ui"
+      "expo-system-ui",
+      "expo-sharing"
     ]
   }
 }
