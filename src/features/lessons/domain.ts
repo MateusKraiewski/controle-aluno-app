@@ -188,6 +188,53 @@ export function generateOccurrences(input: RecurrenceInput): Result<{ dates: str
   return { ok: true, value: { dates, truncated } };
 }
 
+/** Weekday indexes (0 = Sunday … 6 = Saturday) stored in a series mask. */
+export function maskToWeekdays(mask: number): number[] {
+  return [0, 1, 2, 3, 4, 5, 6].filter((day) => (mask & (1 << day)) !== 0);
+}
+
+/** A local civil moment: the date and minutes since midnight on the device clock. */
+export type Moment = { localDate: string; minute: number };
+
+export function toMoment(date: Date): Moment {
+  return { localDate: toLocalDate(date), minute: date.getHours() * 60 + date.getMinutes() };
+}
+
+/** True when a lesson starting at this date/minute has not started yet at `now`. */
+export function isAfter(localDate: string, startMinute: number, now: Moment): boolean {
+  return localDate > now.localDate || (localDate === now.localDate && startMinute > now.minute);
+}
+
+export type SeriesEndError = 'endDateFormat' | 'endBeforeStart' | 'spanTooLong' | 'tooMany';
+
+export type SeriesRule = {
+  startDate: string;
+  endDate: string;
+  weekdays: readonly number[];
+  frequency: Frequency;
+  startMinute: number;
+};
+
+/**
+ * Plans a change of the series end date. Extending returns the missing occurrence
+ * dates after the current end that are still in the future and do not already exist
+ * (by original date), so applying the same change twice adds nothing. Shortening adds
+ * nothing; which occurrences may be removed is decided by the repository (only
+ * future, untouched ones). The whole rule stays within the creation limits.
+ */
+export function planSeriesEnd(rule: SeriesRule, newEnd: string, now: Moment, existingOriginalDates: ReadonlySet<string>): Result<{ add: string[] }, SeriesEndError> {
+  const end = newEnd.trim();
+  if (!isValidLocalDate(end)) return { ok: false, error: 'endDateFormat' };
+  if (end < rule.startDate) return { ok: false, error: 'endBeforeStart' };
+  if (daysBetween(rule.startDate, end) > MAX_RECURRENCE_SPAN_DAYS) return { ok: false, error: 'spanTooLong' };
+  if (end <= rule.endDate) return { ok: true, value: { add: [] } };
+  const generated = generateOccurrences({ startDate: rule.startDate, endDate: end, weekdays: rule.weekdays, frequency: rule.frequency });
+  if (!generated.ok) return { ok: true, value: { add: [] } };
+  if (generated.value.truncated) return { ok: false, error: 'tooMany' };
+  const add = generated.value.dates.filter((date) => date > rule.endDate && isAfter(date, rule.startMinute, now) && !existingOriginalDates.has(date));
+  return { ok: true, value: { add } };
+}
+
 export type TimeSlot = { id?: number; localDate: string; startMinute: number; durationMinutes: number; status?: 'planned' | 'cancelled' };
 
 /** Same-day overlap check. Cancelled lessons and the lesson being edited never conflict. */

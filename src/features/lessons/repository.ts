@@ -1,8 +1,8 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { lessonSearchText, normalizeForSearch } from '../../lib/text';
-import { addDays, toSearchPattern } from './domain';
-import type { TimeSlot } from './domain';
-import type { Attendance, HistoryQuery, Lesson, LessonStatus, LessonUpdate, NewLesson, NewSeries, Scope } from './types';
+import { MAX_OCCURRENCES, addDays, maskToWeekdays, planSeriesEnd, toMoment, toSearchPattern } from './domain';
+import type { Moment, Result, SeriesEndError, TimeSlot } from './domain';
+import type { Attendance, EditScope, HistoryQuery, Lesson, LessonStatus, LessonUpdate, NewLesson, NewSeries, Scope, SeriesInfo } from './types';
 
 // All SQL is static text with bound parameters; user text never composes SQL.
 const MAX_PAGE = 100;
@@ -22,20 +22,30 @@ type LessonRow = {
   status: LessonStatus;
   cancel_reason: string | null;
   series_id: number | null;
+  series_exception: number;
   created_at: number;
   updated_at: number | null;
 };
 
 const LESSON_COLUMNS = `l.id, l.subject_id, s.name AS subject, l.teacher_name, l.local_date, l.start_minute,
   l.duration_minutes, l.planned_content, l.studied_content, l.attendance, l.status, l.cancel_reason,
-  l.series_id, l.created_at, l.updated_at`;
+  l.series_id, l.series_exception, l.created_at, l.updated_at`;
+
+/**
+ * Occurrences a series-wide change may touch: still planned, nothing recorded
+ * (attendance, studied content, notes, next step), never edited on their own, and not
+ * started yet at ($today, $minute). Static SQL fragment; values are bound by name.
+ */
+const UNTOUCHED_FUTURE = `status = 'planned' AND attendance = 'unmarked' AND studied_content IS NULL
+  AND private_notes IS NULL AND next_step IS NULL AND series_exception = 0
+  AND (local_date > $today OR (local_date = $today AND start_minute > $minute))`;
 
 function toLesson(row: LessonRow): Lesson {
   return {
     id: row.id, subjectId: row.subject_id, subject: row.subject, teacher: row.teacher_name, localDate: row.local_date,
     startMinute: row.start_minute, durationMinutes: row.duration_minutes, plannedContent: row.planned_content,
     studiedContent: row.studied_content, attendance: row.attendance, status: row.status, cancelReason: row.cancel_reason,
-    seriesId: row.series_id, createdAt: row.created_at, updatedAt: row.updated_at,
+    seriesId: row.series_id, seriesException: row.series_exception === 1, createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
 
@@ -108,8 +118,9 @@ export async function createLessonSeries(db: SQLiteDatabase, input: NewSeries): 
     const now = Date.now();
     const subjectId = await resolveSubject(db, input.subject, now);
     const series = await db.runAsync(
-      'INSERT INTO lesson_series (subject_id, frequency, weekdays_mask, start_date, end_date, start_minute, duration_minutes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      subjectId, input.frequency, mask, input.localDate, input.endDate, input.startMinute, input.durationMinutes, now);
+      `INSERT INTO lesson_series (subject_id, frequency, weekdays_mask, start_date, end_date, start_minute, duration_minutes, teacher_name, planned_content, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      subjectId, input.frequency, mask, input.localDate, input.endDate, input.startMinute, input.durationMinutes, input.teacher, input.plannedContent, now);
     seriesId = series.lastInsertRowId;
     const statement = await db.prepareAsync(
       'INSERT INTO lessons (subject_id, teacher_name, local_date, start_minute, duration_minutes, planned_content, search_text, series_id, original_local_date, created_at, updated_at) VALUES ($subject, $teacher, $date, $start, $duration, $planned, $search, $series, $date, $now, $now)');
@@ -128,17 +139,138 @@ export async function createLessonSeries(db: SQLiteDatabase, input: NewSeries): 
   return { seriesId, count: input.dates.length };
 }
 
-/** Edits one occurrence only. Series occurrences keep their link and original date. */
-export async function updateLesson(db: SQLiteDatabase, id: number, input: LessonUpdate): Promise<void> {
+/**
+ * Edits a lesson. Series occurrences keep their link and original date. With scope
+ * 'all' on a series occurrence, the new time, duration, teacher and planned content
+ * also become the series template and are applied to every other future, untouched
+ * occurrence (see UNTOUCHED_FUTURE); past, recorded, cancelled and individually edited
+ * occurrences are never changed. The edited occurrence is flagged as individually
+ * edited when its governed fields differ from the template. One short transaction.
+ * Returns how many other occurrences changed.
+ */
+export async function updateLesson(db: SQLiteDatabase, id: number, input: LessonUpdate, options: { scope?: EditScope; now?: Moment } = {}): Promise<{ seriesUpdated: number }> {
+  let seriesUpdated = 0;
   await db.withTransactionAsync(async () => {
     const now = Date.now();
     const subjectId = await resolveSubject(db, input.subject, now);
-    await db.runAsync(
-      `UPDATE lessons SET subject_id = ?, teacher_name = ?, local_date = ?, start_minute = ?, duration_minutes = ?,
-        planned_content = ?, studied_content = ?, search_text = ?, updated_at = ? WHERE id = ?`,
-      subjectId, input.teacher, input.localDate, input.startMinute, input.durationMinutes,
-      input.plannedContent, input.studiedContent, lessonSearchText(input), now, id);
+    const anchor = await db.getFirstAsync<{ series_id: number | null }>('SELECT series_id FROM lessons WHERE id = ?', id);
+    if (!anchor) return;
+    if (options.scope === 'all' && anchor.series_id !== null) {
+      const moment = options.now ?? toMoment(new Date());
+      await db.runAsync(
+        'UPDATE lesson_series SET start_minute = ?, duration_minutes = ?, teacher_name = ?, planned_content = ? WHERE id = ?',
+        input.startMinute, input.durationMinutes, input.teacher, input.plannedContent, anchor.series_id);
+      const result = await db.runAsync(`
+        UPDATE lessons SET start_minute = $start, duration_minutes = $duration, teacher_name = $teacher, planned_content = $planned,
+          search_text = $search, updated_at = $now
+        WHERE series_id = $series AND id <> $id AND ${UNTOUCHED_FUTURE}`, {
+        $start: input.startMinute, $duration: input.durationMinutes, $teacher: input.teacher, $planned: input.plannedContent,
+        $search: lessonSearchText({ teacher: input.teacher, plannedContent: input.plannedContent, studiedContent: null }),
+        $now: now, $series: anchor.series_id, $id: id, $today: moment.localDate, $minute: moment.minute,
+      });
+      seriesUpdated = result.changes;
+    }
+    await db.runAsync(`
+      UPDATE lessons SET subject_id = $subject, teacher_name = $teacher, local_date = $date, start_minute = $start,
+        duration_minutes = $duration, planned_content = $planned, studied_content = $studied, search_text = $search, updated_at = $now,
+        series_exception = CASE WHEN series_id IS NULL THEN 0 ELSE MAX(series_exception, EXISTS (
+          SELECT 1 FROM lesson_series s WHERE s.id = lessons.series_id AND (
+            s.subject_id <> $subject OR lessons.original_local_date IS NOT $date OR s.start_minute <> $start
+            OR s.duration_minutes <> $duration OR s.teacher_name IS NOT $teacher OR s.planned_content IS NOT $planned))) END
+      WHERE id = $id`, {
+      $subject: subjectId, $teacher: input.teacher, $date: input.localDate, $start: input.startMinute, $duration: input.durationMinutes,
+      $planned: input.plannedContent, $studied: input.studiedContent, $search: lessonSearchText(input), $now: now, $id: id,
+    });
   });
+  return { seriesUpdated };
+}
+
+/** Other occurrences an 'all' edit of this series would change now (for preview and overlap checks). */
+export async function listSeriesEditTargets(db: SQLiteDatabase, seriesId: number, excludeId: number, now: Moment = toMoment(new Date())): Promise<{ id: number; localDate: string }[]> {
+  const rows = await db.getAllAsync<{ id: number; local_date: string }>(`
+    SELECT id, local_date FROM lessons
+    WHERE series_id = $series AND id <> $id AND ${UNTOUCHED_FUTURE}
+    ORDER BY local_date, start_minute, id LIMIT $limit`,
+  { $series: seriesId, $id: excludeId, $today: now.localDate, $minute: now.minute, $limit: MAX_OCCURRENCES });
+  return rows.map((row) => ({ id: row.id, localDate: row.local_date }));
+}
+
+type SeriesRow = {
+  id: number; subject_id: number; frequency: 'weekly' | 'biweekly'; weekdays_mask: number; start_date: string; end_date: string;
+  start_minute: number; duration_minutes: number; teacher_name: string | null; planned_content: string | null;
+};
+
+export async function getSeries(db: SQLiteDatabase, id: number): Promise<SeriesInfo | null> {
+  const row = await db.getFirstAsync<SeriesRow>(`
+    SELECT id, subject_id, frequency, weekdays_mask, start_date, end_date, start_minute, duration_minutes, teacher_name, planned_content
+    FROM lesson_series WHERE id = ?`, id);
+  if (!row) return null;
+  return {
+    id: row.id, subjectId: row.subject_id, frequency: row.frequency, weekdays: maskToWeekdays(row.weekdays_mask),
+    startDate: row.start_date, endDate: row.end_date, startMinute: row.start_minute, durationMinutes: row.duration_minutes,
+    teacher: row.teacher_name, plannedContent: row.planned_content,
+  };
+}
+
+export type SeriesEndOutcome = { added: number; removed: number; seriesDeleted: boolean };
+
+/**
+ * Changes the series end date. Extending creates the missing future occurrences after
+ * the old end from the series template (idempotent: existing original dates are
+ * skipped). Shortening deletes only future, untouched occurrences after the new end;
+ * anything recorded, cancelled or edited stays. With `dryRun` nothing is written and
+ * the counts are a preview. Writes run in one short transaction.
+ */
+export async function changeSeriesEnd(
+  db: SQLiteDatabase, seriesId: number, newEnd: string, options: { now?: Moment; dryRun?: boolean } = {},
+): Promise<Result<SeriesEndOutcome, SeriesEndError | 'notFound'>> {
+  const moment = options.now ?? toMoment(new Date());
+  const end = newEnd.trim();
+  let outcome: Result<SeriesEndOutcome, SeriesEndError | 'notFound'> = { ok: false, error: 'notFound' };
+  const run = async () => {
+    const series = await getSeries(db, seriesId);
+    if (!series) { outcome = { ok: false, error: 'notFound' }; return; }
+    const existing = await db.getAllAsync<{ original_local_date: string }>(
+      'SELECT original_local_date FROM lessons WHERE series_id = ? AND original_local_date > ? LIMIT ?', seriesId, series.endDate, MAX_OCCURRENCES * 2);
+    const plan = planSeriesEnd(series, end, moment, new Set(existing.map((row) => row.original_local_date)));
+    if (!plan.ok) { outcome = plan; return; }
+    const removable = { $series: seriesId, $end: end, $today: moment.localDate, $minute: moment.minute };
+    const removeWhere = `series_id = $series AND local_date > $end AND ${UNTOUCHED_FUTURE}`;
+    if (options.dryRun) {
+      const count = end < series.endDate
+        ? (await db.getFirstAsync<{ total: number }>(`SELECT COUNT(*) AS total FROM lessons WHERE ${removeWhere}`, removable))?.total ?? 0
+        : 0;
+      outcome = { ok: true, value: { added: plan.value.add.length, removed: count, seriesDeleted: false } };
+      return;
+    }
+    let removed = 0;
+    if (end < series.endDate) removed = (await db.runAsync(`DELETE FROM lessons WHERE ${removeWhere}`, removable)).changes;
+    if (plan.value.add.length > 0) {
+      const now = Date.now();
+      const statement = await db.prepareAsync(`
+        INSERT INTO lessons (subject_id, teacher_name, local_date, start_minute, duration_minutes, planned_content, search_text, series_id, original_local_date, created_at, updated_at)
+        VALUES ($subject, $teacher, $date, $start, $duration, $planned, $search, $series, $date, $now, $now)`);
+      const searchText = lessonSearchText({ teacher: series.teacher, plannedContent: series.plannedContent, studiedContent: null });
+      try {
+        for (const date of plan.value.add) {
+          await statement.executeAsync({
+            $subject: series.subjectId, $teacher: series.teacher, $date: date, $start: series.startMinute,
+            $duration: series.durationMinutes, $planned: series.plannedContent, $search: searchText, $series: seriesId, $now: now,
+          });
+        }
+      } finally {
+        await statement.finalizeAsync();
+      }
+    }
+    const remaining = await db.getFirstAsync<{ total: number }>('SELECT COUNT(*) AS total FROM lessons WHERE series_id = ?', seriesId);
+    const seriesDeleted = !remaining || remaining.total === 0;
+    if (seriesDeleted) await db.runAsync('DELETE FROM lesson_series WHERE id = ?', seriesId);
+    else await db.runAsync('UPDATE lesson_series SET end_date = ? WHERE id = ?', end, seriesId);
+    outcome = { ok: true, value: { added: plan.value.add.length, removed, seriesDeleted } };
+  };
+  if (options.dryRun) await run();
+  else await db.withTransactionAsync(run);
+  return outcome;
 }
 
 /** The student's own attendance record. Cancelled lessons cannot receive attendance. */

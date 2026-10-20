@@ -10,12 +10,12 @@ import {
   MAX_NAME_LENGTH, MAX_OCCURRENCES, MAX_TEXT_LENGTH, addDays, findConflicts, findSeriesConflicts, formatTemplate,
   formatTime, generateOccurrences, isValidLocalDate, validateLessonDraft, weekdayOf,
 } from '../features/lessons/domain';
-import type { DraftError, Frequency, LessonDraft, RecurrenceError, TimeSlot } from '../features/lessons/domain';
+import type { DraftError, Frequency, LessonDraft, RecurrenceError, SeriesEndError, TimeSlot } from '../features/lessons/domain';
 import {
-  cancelLessons, createLesson, createLessonSeries, deleteLessons, getLesson, listTimeSlots, restoreLesson,
-  updateAttendance, updateLesson,
+  cancelLessons, changeSeriesEnd, createLesson, createLessonSeries, deleteLessons, getLesson, getSeries, listSeriesEditTargets,
+  listTimeSlots, restoreLesson, updateAttendance, updateLesson,
 } from '../features/lessons/repository';
-import type { Attendance, Lesson, Scope } from '../features/lessons/types';
+import type { Attendance, EditScope, Lesson, Scope, SeriesInfo } from '../features/lessons/types';
 import { listSubjects } from '../features/subjects/repository';
 import { ask } from '../lib/dialogs';
 import { shortDate } from '../lib/format';
@@ -34,8 +34,17 @@ const DRAFT_ERRORS: Record<DraftError, TranslationKey> = {
 const RECURRENCE_ERRORS: Record<RecurrenceError, TranslationKey> = {
   endDateFormat: 'endDateFormat', endBeforeStart: 'endBeforeStart', spanTooLong: 'spanTooLong', noWeekdays: 'noWeekdays', noOccurrences: 'noOccurrences',
 };
+const SERIES_END_ERRORS: Record<SeriesEndError | 'notFound', TranslationKey> = {
+  endDateFormat: 'endDateFormat', endBeforeStart: 'endBeforeStart', spanTooLong: 'spanTooLong', tooMany: 'seriesTooMany', notFound: 'notFound',
+};
 // Monday-first display order of weekday indexes (0 = Sunday).
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+/** Fields a series template governs; changing one of them can apply to the whole series. */
+function governedChanged(lesson: Lesson, draft: LessonDraft): boolean {
+  return lesson.startMinute !== draft.startMinute || lesson.durationMinutes !== draft.durationMinutes
+    || lesson.teacher !== draft.teacher || lesson.plannedContent !== draft.plannedContent;
+}
 const DEFAULT_SERIES_WEEKS = 12;
 
 type EditorProps = { target: EditorTarget | null; onClose: () => void; onChanged: () => void };
@@ -67,6 +76,22 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
   const [quickSubjects, setQuickSubjects] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [series, setSeries] = useState<SeriesInfo | null>(null);
+  const [newEnd, setNewEnd] = useState('');
+  const [seriesMessage, setSeriesMessage] = useState('');
+  const [seriesError, setSeriesError] = useState('');
+  const seriesId = lesson?.seriesId ?? null;
+
+  useEffect(() => {
+    if (seriesId === null) { setSeries(null); return; }
+    let active = true;
+    getSeries(db, seriesId).then((row) => {
+      if (!active) return;
+      setSeries(row);
+      if (row) setNewEnd(row.endDate);
+    }).catch(() => { if (active) setSeries(null); });
+    return () => { active = false; };
+  }, [db, seriesId]);
 
   useEffect(() => {
     listSubjects(db, { includeArchived: false })
@@ -110,10 +135,11 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
     return generateOccurrences({ startDate: date, endDate: endDate.trim(), weekdays, frequency: repeat });
   }, [isEdit, repeat, date, endDate, weekdays]);
 
-  async function confirmConflicts(draft: LessonDraft, dates: string[] | null): Promise<boolean> {
+  /** `dates` must be sorted; `ignoreIds` are lessons that move with this save (series-wide edit). */
+  async function confirmConflicts(draft: LessonDraft, dates: string[] | null, ignoreIds: readonly number[] = []): Promise<boolean> {
     const first = dates ? dates[0] : draft.localDate;
     const last = dates ? dates[dates.length - 1] : draft.localDate;
-    const slots = await listTimeSlots(db, first, last);
+    const slots = (await listTimeSlots(db, first, last)).filter((slot) => !ignoreIds.includes(slot.id));
     const conflicts: TimeSlot[] = dates
       ? findSeriesConflicts(dates, draft.startMinute, draft.durationMinutes, slots)
       : findConflicts({ id: lesson?.id, localDate: draft.localDate, startMinute: draft.startMinute, durationMinutes: draft.durationMinutes }, slots);
@@ -136,10 +162,30 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
     setBusy(true);
     setError('');
     try {
-      if (!(await confirmConflicts(draft, dates))) return;
+      let scope: EditScope = 'this';
+      let ignoreIds: number[] = [];
+      // A series occurrence whose time/duration/teacher/plan changed (same date and subject)
+      // may apply the change to the series' future untouched occurrences.
+      if (lesson && lesson.seriesId !== null && lesson.localDate === draft.localDate
+        && lesson.subject.toLowerCase() === draft.subject.toLowerCase() && governedChanged(lesson, draft)) {
+        const targets = await listSeriesEditTargets(db, lesson.seriesId, lesson.id);
+        if (targets.length > 0) {
+          const choice = await ask<EditScope>(t.editScopeTitle, formatTemplate(t.editScopeBody, { count: targets.length }), t.back, [
+            { label: t.scopeThis, value: 'this' },
+            { label: t.scopeAllFuture, value: 'all' },
+          ]);
+          if (!choice) return;
+          if (choice === 'all') {
+            scope = 'all';
+            dates = [...new Set([draft.localDate, ...targets.map((item) => item.localDate)])].sort();
+            ignoreIds = [lesson.id, ...targets.map((item) => item.id)];
+          }
+        }
+      }
+      if (!(await confirmConflicts(draft, dates, ignoreIds))) return;
       const base = { subject: draft.subject, teacher: draft.teacher, localDate: draft.localDate, startMinute: draft.startMinute, durationMinutes: draft.durationMinutes, plannedContent: draft.plannedContent };
       if (target.mode === 'edit') {
-        await updateLesson(db, target.id, { ...base, studiedContent: draft.studiedContent });
+        await updateLesson(db, target.id, { ...base, studiedContent: draft.studiedContent }, { scope });
       } else if (dates && repeat !== 'none') {
         await createLessonSeries(db, { ...base, localDate: dates[0], frequency: repeat, weekdays, endDate: endDate.trim(), dates });
       } else {
@@ -149,6 +195,39 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
       onClose();
     } catch {
       setError(t.saveError);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Previews the new series end (counts), asks for confirmation, then applies it. */
+  async function changeEnd() {
+    if (!lesson || !series) return;
+    setBusy(true);
+    setError('');
+    setSeriesMessage('');
+    setSeriesError('');
+    try {
+      const preview = await changeSeriesEnd(db, series.id, newEnd, { dryRun: true });
+      if (!preview.ok) { setSeriesError(t[SERIES_END_ERRORS[preview.error]]); return; }
+      const { added, removed } = preview.value;
+      if (added + removed > 0) {
+        const choice = await ask(t.seriesEndTitle, formatTemplate(t.seriesEndBody, { added, removed }), t.back,
+          [{ label: t.apply, value: 'apply', destructive: removed > 0 }]);
+        if (choice !== 'apply') return;
+      }
+      const result = await changeSeriesEnd(db, series.id, newEnd);
+      if (!result.ok) { setSeriesError(t[SERIES_END_ERRORS[result.error]]); return; }
+      onChanged();
+      const current = await getLesson(db, lesson.id);
+      if (!current) { onClose(); return; }
+      setLesson(current);
+      const updated = await getSeries(db, series.id);
+      setSeries(updated);
+      if (updated) setNewEnd(updated.endDate);
+      setSeriesMessage(formatTemplate(t.seriesEndDone, { added: result.value.added, removed: result.value.removed }));
+    } catch {
+      setSeriesError(t.seriesEndError);
     } finally {
       setBusy(false);
     }
@@ -287,6 +366,28 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
                 <Text style={styles.saveButtonText}>{busy ? t.saving : t.save}</Text>
               </Pressable>
               <Text style={styles.privacyNote}>{t.privacy}</Text>
+
+              {lesson && series && (
+                <>
+                  <View style={styles.divider} />
+                  <Text accessibilityRole="header" style={styles.fieldLabel}>{t.seriesSection}</Text>
+                  <Text style={styles.info}>
+                    {formatTemplate(t.seriesSummary, {
+                      frequency: series.frequency === 'weekly' ? t.weekly : t.biweekly,
+                      days: WEEKDAY_ORDER.filter((day) => series.weekdays.includes(day)).map((day) => weekdayLabel(t, day)).join(', '),
+                      start: shortDate(series.startDate, language),
+                      end: shortDate(series.endDate, language),
+                    })}
+                  </Text>
+                  <Field label={t.seriesEndNew} value={newEnd} onChangeText={setNewEnd} placeholder={series.endDate} keyboardType="numbers-and-punctuation" maxLength={10} />
+                  <Pressable accessibilityRole="button" disabled={busy || newEnd.trim() === series.endDate} onPress={() => void changeEnd()}
+                    style={[styles.secondaryButton, (busy || newEnd.trim() === series.endDate) && styles.disabled]}>
+                    <Text style={styles.secondaryButtonText}>{t.seriesEndApply}</Text>
+                  </Pressable>
+                  {!!seriesMessage && <Text accessibilityLiveRegion="polite" style={[styles.info, { marginTop: 10 }]}>{seriesMessage}</Text>}
+                  <ErrorText message={seriesError} />
+                </>
+              )}
 
               {lesson && (
                 <>

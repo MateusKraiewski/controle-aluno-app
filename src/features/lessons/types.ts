@@ -17,6 +17,8 @@ export type Lesson = {
   status: LessonStatus;
   cancelReason: string | null;
   seriesId: number | null;
+  /** The occurrence was edited on its own; series-wide edits skip it. */
+  seriesException: boolean;
   createdAt: number;
   updatedAt: number | null;
 };
@@ -42,6 +44,23 @@ export type NewSeries = NewLesson & {
 };
 
 export type Scope = 'this' | 'following';
+
+/** Scope of an edit: this occurrence only, or the series template and its future untouched occurrences. */
+export type EditScope = 'this' | 'all';
+
+export type SeriesInfo = {
+  id: number;
+  subjectId: number;
+  frequency: Frequency;
+  /** 0 = Sunday … 6 = Saturday. */
+  weekdays: number[];
+  startDate: string;
+  endDate: string;
+  startMinute: number;
+  durationMinutes: number;
+  teacher: string | null;
+  plannedContent: string | null;
+};
 
 export type HistoryCursor = { localDate: string; startMinute: number; id: number };
 
