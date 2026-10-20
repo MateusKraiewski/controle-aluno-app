@@ -25,10 +25,19 @@ export function normalizeForSearch(text: string): string {
   return stripMarks(text.toLowerCase()).toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-/** Search key for a lesson's own text fields (subject name is searched on `subjects.search_name`). */
-export function lessonSearchText(fields: { teacher: string | null; plannedContent: string | null; studiedContent: string | null }): string {
+/** Lesson text fields that feed the search key (subject name is searched on `subjects.search_name`). */
+export type LessonSearchFields = {
+  teacher: string | null;
+  plannedContent: string | null;
+  studiedContent: string | null;
+  privateNotes?: string | null;
+  nextStep?: string | null;
+};
+
+/** Search key for a lesson's own text fields, in a fixed order. */
+export function lessonSearchText(fields: LessonSearchFields): string {
   // Newline separator: the search term never contains one, so a match cannot span two fields.
-  return [fields.teacher, fields.plannedContent, fields.studiedContent]
+  return [fields.teacher, fields.plannedContent, fields.studiedContent, fields.privateNotes ?? null, fields.nextStep ?? null]
     .map((value) => (value ? normalizeForSearch(value) : ''))
     .join('\n');
 }

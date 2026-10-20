@@ -224,3 +224,74 @@ describe('delete all data', () => {
     assert.equal(snapshot(raw), before);
   });
 });
+
+describe('backup schema compatibility', () => {
+  /** Turns a current export into a document exactly as the previous app version (v3) wrote it. */
+  function asV3(document: BackupDocument): Record<string, unknown> {
+    return {
+      ...document,
+      schema_version: 3,
+      subjects: document.subjects.map(({ color: _c, sort_order: _o, ...row }) => row),
+      lesson_series: document.lesson_series.map(({ teacher_name: _t, planned_content: _p, ...row }) => row),
+      lessons: document.lessons.map(({ private_notes: _n, next_step: _s, series_exception: _e, ...row }) => row),
+    };
+  }
+
+  it('exports the v4 fields', async () => {
+    await seed(db);
+    raw.exec("UPDATE subjects SET color = 'blue', sort_order = 2 WHERE name = 'Física'");
+    const document = await exportBackup(db);
+    assert.equal(document.schema_version, 4);
+    assert.deepEqual(Object.keys(document.subjects[0]), ['id', 'name', 'created_at', 'archived_at', 'color', 'sort_order']);
+    assert.ok(document.lesson_series.every((row) => 'teacher_name' in row && 'planned_content' in row));
+    assert.ok(document.lessons.every((row) => 'private_notes' in row && 'next_step' in row && 'series_exception' in row));
+    const fisica = document.subjects.find((row) => row.name === 'Física');
+    assert.deepEqual([fisica?.color, fisica?.sort_order], ['blue', 2]);
+  });
+
+  it('still restores a v3 backup and derives the series state', async () => {
+    await seed(db);
+    raw.exec("UPDATE lessons SET start_minute = 700, series_exception = 1 WHERE id = (SELECT MAX(id) FROM lessons WHERE series_id IS NOT NULL)");
+    const v4 = await exportBackup(db);
+    const text = JSON.stringify(asV3(v4));
+    const check = validateBackup(text);
+    if (!check.ok) throw new Error(`${check.error.code} ${check.error.path ?? ''}`);
+    assert.equal(check.value.schema_version, 3);
+    assert.equal(summarizeBackup(check.value).schemaVersion, 3);
+
+    const target = await openMigrated();
+    await restoreBackup(target.db, check.value);
+    const restored = await exportBackup(target.db);
+    assert.equal(restored.schema_version, 4);
+    // Everything the v3 document carried is identical; v4 fields are filled/derived.
+    assert.deepEqual(asV3(restored).lessons, asV3(v4).lessons);
+    assert.deepEqual(restored.lesson_series.map((row) => [row.teacher_name, row.planned_content]), [[null, null]]);
+    assert.deepEqual(restored.lessons.filter((row) => row.series_exception === 1).map((row) => row.id), v4.lessons.filter((row) => row.series_exception === 1).map((row) => row.id));
+    assert.ok(restored.subjects.every((row) => row.color === null && row.sort_order === null));
+  });
+
+  it('rejects mixed or invalid v4 fields', async () => {
+    await seed(db);
+    const good = JSON.parse(serializeBackup(await exportBackup(db))) as any;
+    const v3 = asV3(good) as any;
+    const cases: [string, unknown, string][] = [
+      ['v3 document with a v4 key', { ...v3, lessons: v3.lessons.map((row: any, index: number) => (index === 0 ? { ...row, private_notes: null } : row)) }, 'lessons[0].private_notes'],
+      ['v4 document without a v4 key', { ...good, subjects: good.subjects.map(({ color: _c, ...row }: any) => row) }, 'subjects[0].color'],
+      ['unknown colour', { ...good, subjects: good.subjects.map((row: any) => ({ ...row, color: '#ff0000' })) }, 'subjects[0].color'],
+      ['negative order', { ...good, subjects: good.subjects.map((row: any) => ({ ...row, sort_order: -1 })) }, 'subjects[0].sort_order'],
+      ['exception without series', { ...good, lessons: good.lessons.map((row: any, index: number) => (index === 0 ? { ...row, series_exception: 1 } : row)) }, 'lessons[0].series_exception'],
+      ['exception not 0/1', { ...good, lessons: good.lessons.map((row: any) => ({ ...row, series_exception: 2 })) }, 'lessons[0].series_exception'],
+      ['blank notes', { ...good, lessons: good.lessons.map((row: any) => ({ ...row, private_notes: '  ' })) }, 'lessons[0].private_notes'],
+      ['long next step', { ...good, lessons: good.lessons.map((row: any) => ({ ...row, next_step: 'x'.repeat(2001) })) }, 'lessons[0].next_step'],
+      ['series teacher with newline', { ...good, lesson_series: good.lesson_series.map((row: any) => ({ ...row, teacher_name: 'a\nb' })) }, 'lesson_series[0].teacher_name'],
+    ];
+    for (const [label, document, path] of cases) {
+      const result = validateBackup(JSON.stringify(document));
+      assert.equal(result.ok, false, label);
+      if (!result.ok) {
+        assert.equal(result.error.code, 'invalidField', label);
+        assert.equal(result.error.path, path, label);
+      }
+    }
+  });
+});

@@ -12,7 +12,10 @@ describe('search normalisation', () => {
   });
 
   it('builds a per-lesson key whose fields cannot be matched across', () => {
-    assert.equal(lessonSearchText({ teacher: 'Ana', plannedContent: null, studiedContent: 'Óptica' }), 'ana\n\noptica');
-    assert.equal(lessonSearchText({ teacher: null, plannedContent: null, studiedContent: null }), '\n\n');
+    assert.equal(lessonSearchText({ teacher: 'Ana', plannedContent: null, studiedContent: 'Óptica' }), 'ana\n\noptica\n\n');
+    assert.equal(lessonSearchText({ teacher: null, plannedContent: null, studiedContent: null }), '\n\n\n\n');
+    assert.equal(
+      lessonSearchText({ teacher: null, plannedContent: null, studiedContent: null, privateNotes: 'Pedir AJUDA', nextStep: 'Rever exercícios' }),
+      '\n\n\npedir ajuda\nrever exercicios');
   });
 });

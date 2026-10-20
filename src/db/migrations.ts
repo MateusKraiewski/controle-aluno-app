@@ -1,9 +1,9 @@
 // Schema migrations, kept free of expo imports so they can be exercised against
-// Node's built-in SQLite in tests. Every step is additive: no DROP; v3 only fills new
-// derived columns.
+// Node's built-in SQLite in tests. Every step is additive: no DROP; v3 and v4 only fill
+// the columns they add.
 import { lessonSearchText, normalizeForSearch } from '../lib/text';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /** Rows per backfill page, so a long history is never read into memory at once. */
 const BACKFILL_PAGE = 500;
@@ -69,6 +69,41 @@ const V3 = `
   ALTER TABLE lessons ADD COLUMN search_text TEXT;
 `;
 
+// v4: subject colour/order, series template (teacher and planned content used by
+// "all occurrences" edits and extensions), private notes, next step and the
+// per-occurrence "individually edited" flag. Nullable/defaulted ADD COLUMN only.
+const V4 = `
+  ALTER TABLE subjects ADD COLUMN color TEXT;
+  ALTER TABLE subjects ADD COLUMN sort_order INTEGER;
+  ALTER TABLE lesson_series ADD COLUMN teacher_name TEXT;
+  ALTER TABLE lesson_series ADD COLUMN planned_content TEXT;
+  ALTER TABLE lessons ADD COLUMN private_notes TEXT;
+  ALTER TABLE lessons ADD COLUMN next_step TEXT;
+  ALTER TABLE lessons ADD COLUMN series_exception INTEGER NOT NULL DEFAULT 0 CHECK(series_exception IN (0, 1));
+`;
+
+/**
+ * Derives the v4 series state for data written before v4 (migration and restore of a
+ * v3 backup). The series template takes teacher/planned content from the earliest
+ * occurrence that was never edited (updated_at equal to created_at), falling back to
+ * the earliest one. An occurrence whose governed fields differ from its series is
+ * marked as individually edited, so "all occurrences" edits never overwrite it.
+ * Only the v4 columns are written. Static SQL, no user values.
+ */
+export async function deriveSeriesState(db: MigrationDatabase): Promise<void> {
+  const pick = (column: string) => `(SELECT l.${column} FROM lessons l WHERE l.series_id = lesson_series.id
+    ORDER BY (l.updated_at IS NOT NULL AND l.updated_at <> l.created_at), l.original_local_date, l.id LIMIT 1)`;
+  await db.execAsync(`
+    UPDATE lesson_series SET teacher_name = ${pick('teacher_name')}, planned_content = ${pick('planned_content')};
+    UPDATE lessons SET series_exception = 1
+    WHERE series_id IS NOT NULL AND EXISTS (
+      SELECT 1 FROM lesson_series s WHERE s.id = lessons.series_id AND (
+        lessons.subject_id <> s.subject_id OR lessons.start_minute <> s.start_minute
+        OR lessons.duration_minutes <> s.duration_minutes OR lessons.local_date IS NOT lessons.original_local_date
+        OR lessons.teacher_name IS NOT s.teacher_name OR lessons.planned_content IS NOT s.planned_content));
+  `);
+}
+
 /** Fills the v3 search columns in id-ordered pages inside the migration transaction. */
 async function backfillSearchColumns(db: MigrationDatabase): Promise<void> {
   for (let after = 0; ;) {
@@ -109,6 +144,10 @@ export async function migrate(db: MigrationDatabase): Promise<number> {
     if (current < 3) {
       await db.execAsync(V3);
       await backfillSearchColumns(db);
+    }
+    if (current < 4) {
+      await db.execAsync(V4);
+      await deriveSeriesState(db);
     }
     await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   });

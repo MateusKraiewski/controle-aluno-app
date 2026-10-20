@@ -46,6 +46,13 @@ const V2_SHIPPED = `
   PRAGMA user_version = 2;
 `;
 
+// Exact v3 step as shipped in the third increment.
+const V3_SHIPPED = `
+  ALTER TABLE subjects ADD COLUMN search_name TEXT;
+  ALTER TABLE lessons ADD COLUMN search_text TEXT;
+  PRAGMA user_version = 3;
+`;
+
 describe('migrations', () => {
   it('creates a fresh database at the current version', async () => {
     const { db, raw } = openTestDatabase();
@@ -110,15 +117,15 @@ describe('migrations', () => {
     const insert = raw.prepare("INSERT INTO lessons (subject_id, local_date, start_minute, duration_minutes, planned_content, created_at) VALUES (1, '2026-09-01', 600, 50, ?, 1)");
     for (let index = 0; index < 600; index += 1) insert.run(`Ação ${index}`);
 
-    assert.equal(await migrate(db), 3);
-    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, 3);
+    assert.equal(await migrate(db), SCHEMA_VERSION);
+    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
     assert.deepEqual(raw.prepare(`SELECT ${columnsBefore} FROM lessons WHERE id <= 2 ORDER BY id`).all().map((row) => ({ ...row })), before);
     assert.deepEqual(raw.prepare('SELECT id, name, archived_at, search_name FROM subjects ORDER BY id').all().map((row) => ({ ...row })), [
       { id: 1, name: 'Física', archived_at: null, search_name: 'fisica' },
       { id: 2, name: 'Educação Física', archived_at: 5, search_name: 'educacao fisica' },
     ]);
-    assert.equal(raw.prepare('SELECT search_text FROM lessons WHERE id = 1').get()?.search_text, 'jose alvares\notica geometrica\n');
-    assert.equal(raw.prepare('SELECT search_text FROM lessons WHERE id = 2').get()?.search_text, '\n\nrevisao');
+    assert.equal(raw.prepare('SELECT search_text FROM lessons WHERE id = 1').get()?.search_text, 'jose alvares\notica geometrica\n\n\n');
+    assert.equal(raw.prepare('SELECT search_text FROM lessons WHERE id = 2').get()?.search_text, '\n\nrevisao\n\n');
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lessons WHERE search_text IS NULL').get()?.n, 0);
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM lessons WHERE search_text LIKE '%acao 599%'").get()?.n, 1);
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lesson_series').get()?.n, 1);
@@ -134,6 +141,60 @@ describe('migrations', () => {
     assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, 2);
     const subjectColumns = raw.prepare('PRAGMA table_info(subjects)').all().map((row) => row.name);
     assert.equal(subjectColumns.includes('search_name'), false);
+    assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lessons').get()?.n, 1);
+  });
+
+  /** A v3 database exactly as the previous increment left it. */
+  function openV3() {
+    const opened = openTestDatabase();
+    opened.raw.exec(V1_SHIPPED);
+    opened.raw.exec(V2_SHIPPED);
+    opened.raw.exec(V3_SHIPPED);
+    return opened;
+  }
+
+  it('upgrades a v3 database to v4 without rewriting existing columns', async () => {
+    const { db, raw } = openV3();
+    raw.exec(`
+      INSERT INTO subjects (id, name, search_name, created_at, archived_at) VALUES (1, 'Física', 'fisica', 1, NULL), (2, 'Química', 'quimica', 1, 9);
+      INSERT INTO lesson_series (id, subject_id, frequency, weekdays_mask, start_date, end_date, start_minute, duration_minutes, created_at)
+      VALUES (1, 1, 'weekly', 2, '2026-10-05', '2026-11-02', 600, 50, 1);
+      INSERT INTO lessons (id, subject_id, teacher_name, local_date, start_minute, duration_minutes, planned_content, studied_content, attendance, status, cancel_reason, series_id, original_local_date, created_at, updated_at, search_text) VALUES
+        (1, 1, 'Ana', '2026-10-05', 600, 50, 'Ótica', 'Lentes', 'attended', 'planned', NULL, 1, '2026-10-05', 10, 20, 'ana\notica\nlentes'),
+        (2, 1, 'Ana', '2026-10-12', 600, 50, 'Ótica', NULL, 'unmarked', 'planned', NULL, 1, '2026-10-12', 10, 10, 'ana\notica\n'),
+        (3, 1, 'Ana', '2026-10-19', 660, 50, 'Ótica', NULL, 'unmarked', 'planned', NULL, 1, '2026-10-19', 10, 30, 'ana\notica\n'),
+        (4, 1, 'Ana', '2026-10-27', 600, 50, 'Ótica', NULL, 'unmarked', 'planned', NULL, 1, '2026-10-26', 10, 30, 'ana\notica\n'),
+        (5, 1, 'Ana', '2026-11-02', 600, 50, 'Capítulo 9', NULL, 'unmarked', 'planned', NULL, 1, '2026-11-02', 10, 30, 'ana\ncapitulo 9\n'),
+        (6, 2, NULL, '2026-10-06', 900, 60, NULL, NULL, 'unmarked', 'cancelled', 'Feriado', NULL, NULL, 3, NULL, '\n\n');
+    `);
+    const v3Columns = 'id, subject_id, teacher_name, local_date, start_minute, duration_minutes, planned_content, studied_content, attendance, status, cancel_reason, series_id, original_local_date, created_at, updated_at, search_text';
+    const lessonsBefore = raw.prepare(`SELECT ${v3Columns} FROM lessons ORDER BY id`).all().map((row) => ({ ...row }));
+    const subjectsBefore = raw.prepare('SELECT id, name, search_name, created_at, archived_at FROM subjects ORDER BY id').all().map((row) => ({ ...row }));
+    const seriesColumns = 'id, subject_id, frequency, weekdays_mask, start_date, end_date, start_minute, duration_minutes, created_at';
+    const seriesBefore = raw.prepare(`SELECT ${seriesColumns} FROM lesson_series ORDER BY id`).all().map((row) => ({ ...row }));
+
+    assert.equal(await migrate(db), 4);
+    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, 4);
+    assert.deepEqual(raw.prepare(`SELECT ${v3Columns} FROM lessons ORDER BY id`).all().map((row) => ({ ...row })), lessonsBefore);
+    assert.deepEqual(raw.prepare('SELECT id, name, search_name, created_at, archived_at FROM subjects ORDER BY id').all().map((row) => ({ ...row })), subjectsBefore);
+    assert.deepEqual(raw.prepare(`SELECT ${seriesColumns} FROM lesson_series ORDER BY id`).all().map((row) => ({ ...row })), seriesBefore);
+    // New columns: empty notes, no colour/order, template from the first never-edited occurrence (id 2).
+    assert.deepEqual({ ...raw.prepare('SELECT teacher_name, planned_content FROM lesson_series WHERE id = 1').get() }, { teacher_name: 'Ana', planned_content: 'Ótica' });
+    assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lessons WHERE private_notes IS NOT NULL OR next_step IS NOT NULL').get()?.n, 0);
+    assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM subjects WHERE color IS NOT NULL OR sort_order IS NOT NULL').get()?.n, 0);
+    // Individually edited occurrences: other time (3), moved date (4), other planned content (5).
+    assert.deepEqual(raw.prepare('SELECT id FROM lessons WHERE series_exception = 1 ORDER BY id').all().map((row) => row.id), [3, 4, 5]);
+    assert.equal(await migrate(db), 4); // idempotent on reopen
+  });
+
+  it('rolls back a failed v4 upgrade and keeps v3 intact', async () => {
+    const { db, raw } = openV3();
+    raw.exec("INSERT INTO subjects (id, name, search_name, created_at) VALUES (1, 'Química', 'quimica', 1); INSERT INTO lessons (subject_id, local_date, start_minute, duration_minutes, created_at, search_text) VALUES (1, '2026-10-01', 600, 50, 1, '\n\n');");
+    raw.exec('ALTER TABLE lessons ADD COLUMN next_step TEXT;'); // injected failure: duplicate column
+    await assert.rejects(migrate(db));
+    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, 3);
+    assert.equal(raw.prepare('PRAGMA table_info(subjects)').all().some((row) => row.name === 'color'), false);
+    assert.equal(raw.prepare('PRAGMA table_info(lesson_series)').all().some((row) => row.name === 'teacher_name'), false);
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lessons').get()?.n, 1);
   });
 });

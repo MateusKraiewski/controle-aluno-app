@@ -2,9 +2,14 @@
 // no Expo, no SQLite. A backup that fails any rule is rejected as a whole.
 import { SCHEMA_VERSION } from '../../db/migrations';
 import { MAX_DURATION, MAX_NAME_LENGTH, MAX_TEXT_LENGTH, MIN_DURATION, isValidLocalDate } from '../lessons/domain';
+import { MAX_SORT_ORDER, SUBJECT_COLORS } from '../subjects/colors';
+import type { SubjectColor } from '../subjects/colors';
 
 export const BACKUP_FORMAT = 'aula-em-dia.backup';
-/** First schema version that can be exported; older documents do not exist. */
+/**
+ * Oldest backup schema still accepted. v3 documents (previous app version) are read
+ * and their missing v4 fields filled with empty values; exports are always current.
+ */
 export const MIN_BACKUP_SCHEMA = 3;
 /** Text size cap (UTF-16 code units) for a pasted or picked backup and for an export. */
 export const MAX_BACKUP_CHARS = 10_000_000;
@@ -16,7 +21,14 @@ export const MAX_CANCEL_REASON_LENGTH = MAX_NAME_LENGTH * 2;
 const MAX_TIMESTAMP = 8_640_000_000_000_000;
 const DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
 
-export type BackupSubject = { id: number; name: string; created_at: number; archived_at: number | null };
+export type BackupSubject = {
+  id: number;
+  name: string;
+  created_at: number;
+  archived_at: number | null;
+  /** v4 */ color: SubjectColor | null;
+  /** v4 */ sort_order: number | null;
+};
 
 export type BackupSeries = {
   id: number;
@@ -28,6 +40,8 @@ export type BackupSeries = {
   start_minute: number;
   duration_minutes: number;
   created_at: number;
+  /** v4 */ teacher_name: string | null;
+  /** v4 */ planned_content: string | null;
 };
 
 export type BackupLesson = {
@@ -46,6 +60,9 @@ export type BackupLesson = {
   original_local_date: string | null;
   created_at: number;
   updated_at: number | null;
+  /** v4 */ private_notes: string | null;
+  /** v4 */ next_step: string | null;
+  /** v4: 1 when the occurrence was edited on its own and series edits must skip it. */ series_exception: 0 | 1;
 };
 
 /**
@@ -180,12 +197,15 @@ function asciiFold(value: string): string {
   return value.replace(/[A-Z]/g, (char) => char.toLowerCase());
 }
 
-const SUBJECT_KEYS = ['id', 'name', 'created_at', 'archived_at'] as const;
-const SERIES_KEYS = ['id', 'subject_id', 'frequency', 'weekdays_mask', 'start_date', 'end_date', 'start_minute', 'duration_minutes', 'created_at'] as const;
-const LESSON_KEYS = [
+const SUBJECT_KEYS_V3 = ['id', 'name', 'created_at', 'archived_at'] as const;
+const SERIES_KEYS_V3 = ['id', 'subject_id', 'frequency', 'weekdays_mask', 'start_date', 'end_date', 'start_minute', 'duration_minutes', 'created_at'] as const;
+const LESSON_KEYS_V3 = [
   'id', 'subject_id', 'teacher_name', 'local_date', 'start_minute', 'duration_minutes', 'planned_content', 'studied_content',
   'attendance', 'status', 'cancel_reason', 'series_id', 'original_local_date', 'created_at', 'updated_at',
 ] as const;
+const SUBJECT_KEYS_V4 = [...SUBJECT_KEYS_V3, 'color', 'sort_order'] as const;
+const SERIES_KEYS_V4 = [...SERIES_KEYS_V3, 'teacher_name', 'planned_content'] as const;
+const LESSON_KEYS_V4 = [...LESSON_KEYS_V3, 'private_notes', 'next_step', 'series_exception'] as const;
 const TOP_KEYS = ['format', 'schema_version', 'exported_at', 'subjects', 'lesson_series', 'lessons'] as const;
 
 function parseDocument(input: unknown, appSchema: number): BackupDocument {
@@ -195,6 +215,8 @@ function parseDocument(input: unknown, appSchema: number): BackupDocument {
   if (schema > appSchema) fail('newerSchema');
   if (schema < MIN_BACKUP_SCHEMA) fail('olderSchema');
   const top = exactKeys(input, TOP_KEYS, '$');
+  // Field sets are exact per version: a v3 document has no v4 keys and vice versa.
+  const v4 = schema >= 4;
   const exportedAt = text(top.exported_at, 'exported_at', 40);
   if (Number.isNaN(Date.parse(exportedAt))) fail('invalidField', 'exported_at');
 
@@ -202,10 +224,12 @@ function parseDocument(input: unknown, appSchema: number): BackupDocument {
   const subjectNames = new Set<string>();
   const subjects = list(top.subjects, 'subjects', MAX_BACKUP_SUBJECTS).map((raw, index): BackupSubject => {
     const path = `subjects[${index}]`;
-    const row = exactKeys(raw, SUBJECT_KEYS, path);
-    const subject = {
+    const row = exactKeys(raw, v4 ? SUBJECT_KEYS_V4 : SUBJECT_KEYS_V3, path);
+    const subject: BackupSubject = {
       id: id(row.id, `${path}.id`), name: name(row.name, `${path}.name`),
       created_at: timestamp(row.created_at, `${path}.created_at`), archived_at: optionalTimestamp(row.archived_at, `${path}.archived_at`),
+      color: v4 && row.color !== null ? oneOf(row.color, SUBJECT_COLORS, `${path}.color`) : null,
+      sort_order: v4 && row.sort_order !== null ? int(row.sort_order, `${path}.sort_order`, 0, MAX_SORT_ORDER) : null,
     };
     if (subjectIds.has(subject.id)) fail('duplicateId', `${path}.id`);
     subjectIds.add(subject.id);
@@ -218,7 +242,7 @@ function parseDocument(input: unknown, appSchema: number): BackupDocument {
   const seriesIds = new Set<number>();
   const series = list(top.lesson_series, 'lesson_series', MAX_BACKUP_SERIES).map((raw, index): BackupSeries => {
     const path = `lesson_series[${index}]`;
-    const row = exactKeys(raw, SERIES_KEYS, path);
+    const row = exactKeys(raw, v4 ? SERIES_KEYS_V4 : SERIES_KEYS_V3, path);
     const item: BackupSeries = {
       id: id(row.id, `${path}.id`),
       subject_id: id(row.subject_id, `${path}.subject_id`),
@@ -229,6 +253,8 @@ function parseDocument(input: unknown, appSchema: number): BackupDocument {
       start_minute: int(row.start_minute, `${path}.start_minute`, 0, 1439),
       duration_minutes: int(row.duration_minutes, `${path}.duration_minutes`, MIN_DURATION, MAX_DURATION),
       created_at: timestamp(row.created_at, `${path}.created_at`),
+      teacher_name: v4 ? optionalTrimmed(row.teacher_name, `${path}.teacher_name`, MAX_NAME_LENGTH) : null,
+      planned_content: v4 ? optionalText(row.planned_content, `${path}.planned_content`, MAX_TEXT_LENGTH) : null,
     };
     if (item.end_date < item.start_date) fail('invalidField', `${path}.end_date`);
     if (seriesIds.has(item.id)) fail('duplicateId', `${path}.id`);
@@ -240,7 +266,7 @@ function parseDocument(input: unknown, appSchema: number): BackupDocument {
   const lessonIds = new Set<number>();
   const lessons = list(top.lessons, 'lessons', MAX_BACKUP_LESSONS).map((raw, index): BackupLesson => {
     const path = `lessons[${index}]`;
-    const row = exactKeys(raw, LESSON_KEYS, path);
+    const row = exactKeys(raw, v4 ? LESSON_KEYS_V4 : LESSON_KEYS_V3, path);
     const lesson: BackupLesson = {
       id: id(row.id, `${path}.id`),
       subject_id: id(row.subject_id, `${path}.subject_id`),
@@ -257,7 +283,11 @@ function parseDocument(input: unknown, appSchema: number): BackupDocument {
       original_local_date: row.original_local_date === null ? null : localDate(row.original_local_date, `${path}.original_local_date`),
       created_at: timestamp(row.created_at, `${path}.created_at`),
       updated_at: optionalTimestamp(row.updated_at, `${path}.updated_at`),
+      private_notes: v4 ? optionalText(row.private_notes, `${path}.private_notes`, MAX_TEXT_LENGTH) : null,
+      next_step: v4 ? optionalText(row.next_step, `${path}.next_step`, MAX_TEXT_LENGTH) : null,
+      series_exception: v4 ? int(row.series_exception, `${path}.series_exception`, 0, 1) as 0 | 1 : 0,
     };
+    if (lesson.series_id === null && lesson.series_exception !== 0) fail('invalidField', `${path}.series_exception`);
     // Domain invariants: a cancelled lesson is never an absence or a presence;
     // only cancelled lessons carry a cancellation reason.
     if (lesson.status === 'cancelled' && lesson.attendance !== 'unmarked') fail('invalidField', `${path}.attendance`);
