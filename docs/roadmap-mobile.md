@@ -8,16 +8,18 @@
 
 ## Fase 1 — rotina e histórico do aluno
 
-- Cadastro/edição/arquivo de matérias com cor e ordem escolhidas.
-- Semana navegável, lista diária, calendário mensal e avisos de sobreposição que deixam a decisão explícita.
-- Recorrências semanais/quinzenais, exceções por feriado, e edição de uma/esta e próximas/todas.
-- Registo posterior de conteúdo realmente estudado, apontamentos privados, tarefa/revisão e estado da aula, separados do plano.
-- Histórico com filtro por matéria/período, busca local e paginação por cursor composto.
-- Exportar/restaurar cópia local e eliminar os dados por iniciativa do aluno.
+**Em curso (código implementado, sem ensaio em aparelho).** Legenda: ✅ implementado · ◐ parcial · ○ por fazer.
+
+- ◐ Cadastro/edição/arquivo de matérias com cor e ordem escolhidas — renomear e arquivar feitos; cor e ordem por fazer.
+- ◐ Semana navegável, lista diária, calendário mensal e avisos de sobreposição que deixam a decisão explícita — semana navegável agrupada por dia e aviso de sobreposição feitos; calendário mensal por fazer.
+- ◐ Recorrências semanais/quinzenais, exceções por feriado, e edição de uma/esta e próximas/todas — criação semanal/quinzenal, edição “só esta”, cancelar/excluir “esta e as seguintes” feitos; editar todas/seguintes, mudar a regra e feriados por fazer.
+- ◐ Registo posterior de conteúdo realmente estudado, apontamentos privados, tarefa/revisão e estado da aula, separados do plano — conteúdo estudado e estado (planeada/cancelada) feitos; apontamentos e tarefas por fazer.
+- ◐ Histórico com filtro por matéria/período, busca local e paginação por cursor composto — matéria, busca e cursor feitos; período por fazer.
+- ○ Exportar/restaurar cópia local e eliminar os dados por iniciativa do aluno.
 
 ## Fase 2 — confiabilidade e acessibilidade
 
-- Testes de repositório em SQLite temporário e migração de versões anteriores.
+- Testes de repositório em SQLite temporário e migração de versões anteriores — ◐ feitos em `node:sqlite` (`npm test`); falta repetir com o SQLite do expo-sqlite em aparelho.
 - Android e iPhone: modo avião, persistência após reinício, datas locais, teclado, leitor de ecrã, tamanhos de texto e orientação.
 - Conjunto de stress de anos de aulas; medir memória, tamanho do banco e tempo de consulta em aparelhos de entrada.
 - Revisão de proteção de ficheiros e de backup do sistema operativo; documentar recuperação e exportação.

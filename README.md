@@ -2,9 +2,9 @@
 
 ## Progresso de entrega
 
-**Estimativa ponderada: 36%.** A barra é clicável: cada segmento abre a etapa, as evidências e o que falta.
+**Estimativa ponderada: 53%.** A barra é clicável: cada segmento abre a etapa, as evidências e o que falta.
 
-[██████████](docs/progress.md#product-and-offline-architecture-10) [█████████████████░░░░░░░░](docs/progress.md#local-storage-and-repositories-25) [█████████░░░░░░░░░░░░░░░░░░░░░░░░░](docs/progress.md#student-app-35) [░░░░░░░░░░░░░░░░░░](docs/progress.md#on-device-quality-20) [░░░░░░░░░░](docs/progress.md#installation-and-cloud-10)
+[██████████](docs/progress.md#product-and-offline-architecture-10) [████████████████████░░░░░](docs/progress.md#local-storage-and-repositories-25) [█████████████████████░░░░░░░░░░░░░░](docs/progress.md#student-app-35) [██░░░░░░░░░░░░░░░░░░](docs/progress.md#on-device-quality-20) [░░░░░░░░░░](docs/progress.md#installation-and-cloud-10)
 
 > Número aproximado e ponderado do escopo, não prontidão de publicação. Cálculo: docs/progress.md.
 
@@ -21,7 +21,7 @@ npm install
 npx expo start
 ```
 
-Use `a` para abrir num emulador Android, ou leia o QR com Expo Go. O primeiro ecrã permite criar aulas e registar a própria presença; a base SQLite é local ao dispositivo. Limpar os dados/reinstalar a aplicação pode apagar o histórico se não houver uma cópia de segurança do dispositivo.
+Use `a` para abrir num emulador Android, ou leia o QR com Expo Go. A app abre na agenda semanal, com separadores para histórico e matérias; a base SQLite é local ao dispositivo. Limpar os dados/reinstalar a aplicação pode apagar o histórico se não houver uma cópia de segurança do dispositivo.
 
 ## Produto e decisões
 
@@ -30,14 +30,30 @@ Use `a` para abrir num emulador Android, ou leia o QR com Expo Go. O primeiro ec
 - [Checklist QA móvel](docs/qa-mobile.md)
 - Continuação da visão aluno/professor: [produto original](https://github.com/MateusKraiewski/controle-aluno/blob/main/PRODUCT.md)
 
-## Estado do primeiro incremento
+## Estado atual (Fase 1 em curso)
 
-- Agenda local de sete dias, com várias matérias e aulas no mesmo dia.
-- Criação de aula com matéria, professor opcional, data, hora, duração e conteúdo planeado.
-- Marcação do estado de presença pelo aluno.
+Implementado no código e coberto por TypeScript, testes automáticos em Node e bundle Android/iOS — **ainda não executado num aparelho ou emulador**:
+
+- Agenda semanal (segunda a domingo) com navegação semana anterior/seguinte e “Hoje”; consulta limitada a 100 aulas por semana.
+- Criar e editar aula: matéria, professor opcional, data, hora, duração, conteúdo planeado e, na edição, conteúdo realmente estudado (separado do plano).
+- Presença registada pelo próprio aluno (Fui/Faltei/Pendente) no cartão e no editor.
+- Cancelar aula como estado distinto de falta (motivo opcional; aula cancelada não aceita presença) e reativar.
+- Excluir aula com confirmação explícita; numa repetição, escolher “só esta” ou “esta e as seguintes”.
+- Repetição semanal ou quinzenal na criação: dias da semana + data final (até 1 ano, máximo 300 aulas), gravada numa única transação e ligada a `lesson_series`.
+- Aviso de sobreposição no mesmo dia antes de guardar, com opção de guardar mesmo assim.
+- Histórico (aulas até hoje) com paginação por cursor, “Carregar mais”, filtro por matéria e pesquisa local.
+- Matérias: renomear (nome único sem diferenciar maiúsculas) e arquivar/reativar sem apagar aulas.
 - Português do Brasil/Portugal, inglês, espanhol e tema sistema/claro/escuro, guardados localmente.
-- SQLite com migração de esquema, transações, WAL, índices de agenda e limites de consulta.
-- Histórico preparado no repositório com paginação por data; o ecrã de histórico e edição ainda fazem parte dos próximos incrementos.
+- SQLite com esquema v2 (migração aditiva da v1 testada), transações, WAL, índices e limites de consulta.
+
+Ainda não implementado: editar todas as ocorrências de uma série ou mudar a regra, feriados/exceções automáticas, calendário mensal, cor/ordem de matérias, apontamentos privados e tarefas, filtro por período, exportação/restauro e eliminação de todos os dados. Detalhes em `docs/offline-first.md` e `docs/progress.md`.
+
+## Testes
+
+```sh
+npm run typecheck   # app + ficheiros de teste
+npm test            # node --test: regras de domínio, migrações e repositórios em node:sqlite
+```
 
 O app não sincroniza dados nem permite confirmação independente do professor. A lista completa de limites e decisões está em `docs/offline-first.md`.
 
