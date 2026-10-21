@@ -66,12 +66,35 @@ const V3_SHIPPED = `
   PRAGMA user_version = 3;
 `;
 
+// Exact v5 step as shipped in the fifth increment.
+const V5_SHIPPED = `
+  CREATE TABLE learning_objectives (
+    id INTEGER PRIMARY KEY,
+    subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE RESTRICT,
+    title TEXT NOT NULL CHECK(length(title) BETWEEN 1 AND 200),
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','practising','done')),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    dismissed_review_basis TEXT CHECK(dismissed_review_basis IS NULL OR length(dismissed_review_basis) = 10),
+    dismissed_review_at INTEGER
+  );
+  CREATE INDEX learning_objectives_subject_idx ON learning_objectives(subject_id, status, id);
+  CREATE TABLE lesson_objectives (
+    lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    objective_id INTEGER NOT NULL REFERENCES learning_objectives(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (lesson_id, objective_id)
+  ) WITHOUT ROWID;
+  CREATE INDEX lesson_objectives_objective_idx ON lesson_objectives(objective_id, lesson_id);
+  PRAGMA user_version = 5;
+`;
+
 describe('migrations', () => {
   it('creates a fresh database at the current version', async () => {
     const { db, raw } = openTestDatabase();
     assert.equal(await migrate(db), SCHEMA_VERSION);
     const tables = raw.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all().map((row) => row.name);
-    assert.deepEqual(tables, ['learning_objectives', 'lesson_objectives', 'lesson_series', 'lessons', 'subjects']);
+    assert.deepEqual(tables, ['attachment_trash', 'learning_objectives', 'lesson_attachments', 'lesson_objectives', 'lesson_series', 'lessons', 'subjects']);
     // Idempotent on reopen.
     assert.equal(await migrate(db), SCHEMA_VERSION);
   });
@@ -238,8 +261,8 @@ describe('migrations', () => {
     };
     const before = Object.fromEntries(Object.entries(tables).map(([key, sql]) => [key, dump(sql)]));
 
-    assert.equal(await migrate(db), 5);
-    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, 5);
+    assert.equal(await migrate(db), SCHEMA_VERSION);
+    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
     assert.deepEqual(Object.fromEntries(Object.entries(tables).map(([key, sql]) => [key, dump(sql)])), before);
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM learning_objectives').get()?.n, 0);
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lesson_objectives').get()?.n, 0);
@@ -254,7 +277,7 @@ describe('migrations', () => {
     raw.exec('DELETE FROM lessons WHERE id = 1');
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lesson_objectives').get()?.n, 0);
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM learning_objectives').get()?.n, 1);
-    assert.equal(await migrate(db), 5); // idempotent on reopen
+    assert.equal(await migrate(db), SCHEMA_VERSION); // idempotent on reopen
   });
 
   it('rolls back a failed v5 upgrade and keeps v4 intact', async () => {
@@ -264,6 +287,67 @@ describe('migrations', () => {
     await assert.rejects(migrate(db));
     assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, 4);
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'learning_objectives'").get()?.n, 0);
+    assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lessons').get()?.n, 1);
+  });
+
+  /** A v5 database exactly as the previous increment left it. */
+  function openV5() {
+    const opened = openV4();
+    opened.raw.exec(V5_SHIPPED);
+    return opened;
+  }
+
+  it('upgrades a v5 database to v6 by only adding the attachment tables and trigger', async () => {
+    const { db, raw } = openV5();
+    raw.exec(`
+      INSERT INTO subjects (id, name, search_name, created_at, archived_at, color, sort_order) VALUES (1, 'Física', 'fisica', 1, NULL, 'blue', 1);
+      INSERT INTO lesson_series (id, subject_id, frequency, weekdays_mask, start_date, end_date, start_minute, duration_minutes, created_at, teacher_name, planned_content)
+      VALUES (1, 1, 'weekly', 2, '2026-10-05', '2026-10-12', 600, 50, 1, 'Ana', 'Ótica');
+      INSERT INTO lessons (id, subject_id, teacher_name, local_date, start_minute, duration_minutes, planned_content, studied_content, attendance, status, cancel_reason, series_id, original_local_date, created_at, updated_at, search_text, private_notes, next_step, series_exception) VALUES
+        (1, 1, 'Ana', '2026-10-05', 600, 50, 'Ótica', 'Lentes', 'attended', 'planned', NULL, 1, '2026-10-05', 10, 20, 'ana otica lentes', 'Nota', 'Rever', 0),
+        (2, 1, 'Ana', '2026-10-12', 600, 50, 'Ótica', NULL, 'unmarked', 'planned', NULL, 1, '2026-10-12', 10, 10, 'ana otica', NULL, NULL, 0);
+      INSERT INTO learning_objectives (id, subject_id, title, status, created_at, updated_at, dismissed_review_basis, dismissed_review_at) VALUES (1, 1, 'Leis de Newton', 'practising', 5, 6, '2026-10-05', 7);
+      INSERT INTO lesson_objectives (lesson_id, objective_id, created_at) VALUES (1, 1, 8);
+    `);
+    const dump = (sql: string) => raw.prepare(sql).all().map((row) => ({ ...row }));
+    const tables = {
+      subjects: 'SELECT id, name, search_name, created_at, archived_at, color, sort_order FROM subjects ORDER BY id',
+      series: 'SELECT * FROM lesson_series ORDER BY id',
+      lessons: 'SELECT * FROM lessons ORDER BY id',
+      objectives: 'SELECT * FROM learning_objectives ORDER BY id',
+      links: 'SELECT * FROM lesson_objectives ORDER BY lesson_id, objective_id',
+    };
+    const before = Object.fromEntries(Object.entries(tables).map(([key, sql]) => [key, dump(sql)]));
+
+    assert.equal(await migrate(db), 6);
+    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, 6);
+    assert.deepEqual(Object.fromEntries(Object.entries(tables).map(([key, sql]) => [key, dump(sql)])), before);
+    assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lesson_attachments').get()?.n, 0);
+    assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM attachment_trash').get()?.n, 0);
+    // Constraints of the new table: known MIME types, 1 byte–5 MB, name lengths, existing lesson.
+    const name = '00000000-0000-4000-8000-000000000001.pdf';
+    raw.exec(`INSERT INTO lesson_attachments (lesson_id, file_name, display_name, mime_type, size_bytes, created_at) VALUES (1, '${name}', 'lista.pdf', 'application/pdf', 100, 9)`);
+    const insert = (values: string) => () => raw.exec(`INSERT INTO lesson_attachments (lesson_id, file_name, display_name, mime_type, size_bytes, created_at) VALUES (${values})`);
+    assert.throws(insert("1, '00000000-0000-4000-8000-000000000002.exe', 'a.exe', 'application/x-msdownload', 1, 1"));
+    assert.throws(insert("1, '00000000-0000-4000-8000-000000000003.pdf', 'a.pdf', 'application/pdf', 5242881, 1"));
+    assert.throws(insert("1, '00000000-0000-4000-8000-000000000004.pdf', '', 'application/pdf', 1, 1"));
+    assert.throws(insert("999, '00000000-0000-4000-8000-000000000005.pdf', 'a.pdf', 'application/pdf', 1, 1"));
+    assert.throws(insert(`2, '${name}', 'dup.pdf', 'application/pdf', 1, 1`));
+    // Deleting the lesson (student action) cascades to the row and queues the file.
+    raw.exec('DELETE FROM lessons WHERE id = 1');
+    assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lesson_attachments').get()?.n, 0);
+    assert.deepEqual(raw.prepare('SELECT file_name FROM attachment_trash').all().map((row) => row.file_name), [name]);
+    assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM learning_objectives').get()?.n, 1);
+    assert.equal(await migrate(db), 6); // idempotent on reopen
+  });
+
+  it('rolls back a failed v6 upgrade and keeps v5 intact', async () => {
+    const { db, raw } = openV5();
+    raw.exec("INSERT INTO subjects (id, name, search_name, created_at) VALUES (1, 'Química', 'quimica', 1); INSERT INTO lessons (subject_id, local_date, start_minute, duration_minutes, created_at, search_text) VALUES (1, '2026-10-01', 600, 50, 1, '');");
+    raw.exec('CREATE TABLE attachment_trash (x INTEGER);'); // injected failure: name clash after the first v6 table
+    await assert.rejects(migrate(db));
+    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, 5);
+    assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'lesson_attachments'").get()?.n, 0);
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lessons').get()?.n, 1);
   });
 });

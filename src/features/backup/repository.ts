@@ -2,7 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { SCHEMA_VERSION, deriveSeriesState, readSchemaVersion } from '../../db/migrations';
 import { lessonSearchText, normalizeForSearch } from '../../lib/text';
 import {
-  BACKUP_FORMAT, MAX_BACKUP_LESSONS, MAX_BACKUP_OBJECTIVES, MAX_BACKUP_OBJECTIVE_LINKS, MAX_BACKUP_SERIES, MAX_BACKUP_SUBJECTS,
+  BACKUP_FORMAT, BACKUP_SCHEMA_VERSION, MAX_BACKUP_LESSONS, MAX_BACKUP_OBJECTIVES, MAX_BACKUP_OBJECTIVE_LINKS, MAX_BACKUP_SERIES, MAX_BACKUP_SUBJECTS,
 } from './format';
 import type { BackupDocument, BackupLesson, BackupLessonObjective, BackupObjective, BackupSeries, BackupSubject, ValidatedBackup } from './format';
 
@@ -40,7 +40,9 @@ async function countAll(db: SQLiteDatabase): Promise<DataCounts> {
 }
 
 /** Child tables first, so foreign keys never block the erase. */
-const DELETE_EVERYTHING = `DELETE FROM lesson_objectives; DELETE FROM learning_objectives;
+// Deleting attachment rows queues their files in attachment_trash (trigger); the caller
+// purges the files after commit (src/features/attachments/files.ts).
+const DELETE_EVERYTHING = `DELETE FROM lesson_attachments; DELETE FROM lesson_objectives; DELETE FROM learning_objectives;
   DELETE FROM lessons; DELETE FROM lesson_series; DELETE FROM subjects;`;
 
 async function assertCurrentSchema(db: SQLiteDatabase): Promise<void> {
@@ -101,7 +103,7 @@ export async function exportBackup(db: SQLiteDatabase, now: Date = new Date()): 
       FROM learning_objectives WHERE id > ? ORDER BY id LIMIT ?`);
     const links = await readLinks(db);
     document = {
-      format: BACKUP_FORMAT, schema_version: SCHEMA_VERSION, exported_at: now.toISOString(),
+      format: BACKUP_FORMAT, schema_version: BACKUP_SCHEMA_VERSION, exported_at: now.toISOString(),
       subjects, lesson_series: series, lessons, learning_objectives: objectives, lesson_objectives: links,
     };
   });
@@ -117,7 +119,7 @@ export async function exportBackup(db: SQLiteDatabase, now: Date = new Date()): 
  * after insertion, and a v3/v4 backup simply has no objectives.
  */
 export async function restoreBackup(db: SQLiteDatabase, backup: ValidatedBackup): Promise<DataCounts> {
-  if (backup.schema_version > SCHEMA_VERSION) throw new SchemaMismatchError();
+  if (backup.schema_version > BACKUP_SCHEMA_VERSION) throw new SchemaMismatchError();
   await assertCurrentSchema(db);
   let counts: DataCounts = { subjects: 0, series: 0, lessons: 0, objectives: 0, objectiveLinks: 0 };
   await db.withTransactionAsync(async () => {

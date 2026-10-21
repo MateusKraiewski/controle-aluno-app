@@ -1,12 +1,18 @@
 // Versioned local backup document and its strict validator. Pure module: no React,
 // no Expo, no SQLite. A backup that fails any rule is rejected as a whole.
-import { SCHEMA_VERSION } from '../../db/migrations';
 import { MAX_DURATION, MAX_NAME_LENGTH, MAX_TEXT_LENGTH, MIN_DURATION, isValidLocalDate } from '../lessons/domain';
 import { MAX_OBJECTIVE_TITLE, OBJECTIVE_STATUSES } from '../objectives/domain';
 import { MAX_SORT_ORDER, SUBJECT_COLORS } from '../subjects/colors';
 import type { SubjectColor } from '../subjects/colors';
 
 export const BACKUP_FORMAT = 'aula-em-dia.backup';
+/**
+ * Version of the backup document, independent of the SQLite schema since schema v6:
+ * the v6 attachment tables are deliberately not part of a backup (neither the files
+ * nor their metadata), so the document shape is still the v5 one. Bump only when the
+ * document itself changes, and keep accepting the previous versions.
+ */
+export const BACKUP_SCHEMA_VERSION = 5;
 /**
  * Oldest backup schema still accepted. v3 and v4 documents (previous app versions) are
  * read and their missing fields filled with empty values; exports are always current.
@@ -85,8 +91,9 @@ export type BackupObjective = {
 export type BackupLessonObjective = { lesson_id: number; objective_id: number; created_at: number };
 
 /**
- * Everything the student recorded. Derived search columns and device preferences
- * (language, theme) are deliberately not part of a backup.
+ * Everything the student recorded except attachments. Derived search columns, device
+ * preferences (language, theme) and lesson attachments (files and their metadata) are
+ * deliberately not part of a backup.
  */
 export type BackupDocument = {
   format: typeof BACKUP_FORMAT;
@@ -387,7 +394,7 @@ export type ValidationResult = { ok: true; value: ValidatedBackup } | { ok: fals
  * subject names, referential integrity and objective tags limited to the lesson's
  * own subject. Returns a fresh copy with only known fields.
  */
-export function validateBackup(source: string, appSchema = SCHEMA_VERSION): ValidationResult {
+export function validateBackup(source: string, appSchema = BACKUP_SCHEMA_VERSION): ValidationResult {
   if (!source.trim()) return { ok: false, error: { code: 'empty' } };
   if (source.length > MAX_BACKUP_CHARS) return { ok: false, error: { code: 'tooLarge' } };
   let parsed: unknown;

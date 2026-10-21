@@ -8,7 +8,7 @@ import { generateOccurrences } from '../lessons/domain';
 import { cancelLessons, createLesson, createLessonSeries, listHistoryPage, updateAttendance, updateLesson } from '../lessons/repository';
 import { createObjective, dismissReviewSuggestion, setLessonObjectiveTag, setObjectiveStatus } from '../objectives/repository';
 import { listSubjects, moveSubject, setSubjectArchived, setSubjectColor } from '../subjects/repository';
-import { BACKUP_FORMAT, MAX_BACKUP_CHARS, backupFileName, serializeBackup, summarizeBackup, validateBackup } from './format';
+import { BACKUP_FORMAT, BACKUP_SCHEMA_VERSION, MAX_BACKUP_CHARS, backupFileName, serializeBackup, summarizeBackup, validateBackup } from './format';
 import type { BackupDocument, BackupErrorCode } from './format';
 import { SchemaMismatchError, countLocalData, deleteAllData, exportBackup, restoreBackup } from './repository';
 
@@ -88,7 +88,7 @@ describe('backup export', () => {
     await seed(db);
     const document = await exportBackup(db, new Date('2026-10-20T12:00:00.000Z'));
     assert.equal(document.format, BACKUP_FORMAT);
-    assert.equal(document.schema_version, SCHEMA_VERSION);
+    assert.equal(document.schema_version, BACKUP_SCHEMA_VERSION);
     assert.equal(document.exported_at, '2026-10-20T12:00:00.000Z');
     assert.deepEqual(Object.keys(document), ['format', 'schema_version', 'exported_at', 'subjects', 'lesson_series', 'lessons', 'learning_objectives', 'lesson_objectives']);
     assert.equal(document.learning_objectives.length, 2);
@@ -98,7 +98,7 @@ describe('backup export', () => {
     assert.ok(document.lessons.every((row) => !('search_text' in row)));
     assert.ok(document.subjects.every((row) => !('search_name' in row)));
     assert.equal(backupFileName(document.exported_at), 'aula-em-dia-backup-2026-10-20.json');
-    assert.deepEqual(summarizeBackup(document), { exportedAt: document.exported_at, schemaVersion: SCHEMA_VERSION, subjects: 4, series: 1, lessons: document.lessons.length, objectives: 2 });
+    assert.deepEqual(summarizeBackup(document), { exportedAt: document.exported_at, schemaVersion: BACKUP_SCHEMA_VERSION, subjects: 4, series: 1, lessons: document.lessons.length, objectives: 2 });
   });
 
   it('reads more rows than one page', async () => {
@@ -137,7 +137,7 @@ describe('backup round trip', () => {
   });
 
   it('restores an empty backup as an empty device', async () => {
-    const empty = validated({ format: BACKUP_FORMAT, schema_version: SCHEMA_VERSION, exported_at: '2026-10-20T00:00:00.000Z', subjects: [], lesson_series: [], lessons: [], learning_objectives: [], lesson_objectives: [] });
+    const empty = validated({ format: BACKUP_FORMAT, schema_version: BACKUP_SCHEMA_VERSION, exported_at: '2026-10-20T00:00:00.000Z', subjects: [], lesson_series: [], lessons: [], learning_objectives: [], lesson_objectives: [] });
     await seed(db);
     assert.deepEqual(await restoreBackup(db, empty), { subjects: 0, series: 0, lessons: 0, objectives: 0, objectiveLinks: 0 });
   });
@@ -162,7 +162,7 @@ describe('backup validation and rollback', () => {
       ['not json', '{"format": ', 'notJson'],
       ['array', '[]', 'notBackup'],
       ['other format', mutate((doc) => { doc.format = 'something-else'; }), 'notBackup'],
-      ['newer schema', mutate((doc) => { doc.schema_version = SCHEMA_VERSION + 1; doc.new_table = []; }), 'newerSchema'],
+      ['newer schema', mutate((doc) => { doc.schema_version = BACKUP_SCHEMA_VERSION + 1; doc.new_table = []; }), 'newerSchema'],
       ['older schema', mutate((doc) => { doc.schema_version = 2; }), 'olderSchema'],
       ['fractional schema', mutate((doc) => { doc.schema_version = 2.5; }), 'invalidField', 'schema_version'],
       ['unknown top key', mutate((doc) => { doc.extra = 1; }), 'invalidField', '$.extra'],
@@ -206,7 +206,7 @@ describe('backup validation and rollback', () => {
   it('never restores a backup from a newer schema, even if handed one directly', async () => {
     const good = await exported();
     const before = snapshot(raw);
-    const newer = validateBackup(JSON.stringify({ ...good, schema_version: SCHEMA_VERSION + 1 }), SCHEMA_VERSION + 1);
+    const newer = validateBackup(JSON.stringify({ ...good, schema_version: BACKUP_SCHEMA_VERSION + 1 }), BACKUP_SCHEMA_VERSION + 1);
     if (!newer.ok) throw new Error(newer.error.code);
     await assert.rejects(restoreBackup(db, newer.value), SchemaMismatchError);
     assert.equal(snapshot(raw), before);
@@ -293,7 +293,7 @@ describe('backup schema compatibility', () => {
     const target = await openMigrated();
     await restoreBackup(target.db, check.value);
     const restored = await exportBackup(target.db);
-    assert.equal(restored.schema_version, SCHEMA_VERSION);
+    assert.equal(restored.schema_version, BACKUP_SCHEMA_VERSION);
     assert.deepEqual([restored.learning_objectives, restored.lesson_objectives], [[], []]);
     // Everything the v3 document carried is identical; v4 fields are filled/derived.
     assert.deepEqual(asV3(restored).lessons, asV3(v4).lessons);

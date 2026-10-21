@@ -1,9 +1,9 @@
 // Schema migrations, kept free of expo imports so they can be exercised against
 // Node's built-in SQLite in tests. Every step is additive: no DROP; v3 and v4 only fill
-// the columns they add; v5 only creates new tables.
+// the columns they add; v5 and v6 only create new tables (and v6 one trigger).
 import { lessonSearchText, normalizeForSearch } from '../lib/text';
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /** Rows per backfill page, so a long history is never read into memory at once. */
 const BACKFILL_PAGE = 500;
@@ -106,6 +106,32 @@ const V5 = `
   CREATE INDEX lesson_objectives_objective_idx ON lesson_objectives(objective_id, lesson_id);
 `;
 
+// v6: lesson attachments. The bytes live in files under the app's document directory
+// (UUID names); SQLite keeps only metadata. Deleting an attachment row (directly or by
+// the lesson's ON DELETE CASCADE) queues its file name in attachment_trash in the same
+// transaction through a trigger, so the file is removed after commit and a crash in
+// between leaves a pending cleanup, never a row pointing at a file the app deleted.
+// New tables, index and trigger only; no existing row or column is touched.
+const V6 = `
+  CREATE TABLE lesson_attachments (
+    id INTEGER PRIMARY KEY,
+    lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    file_name TEXT NOT NULL UNIQUE CHECK(length(file_name) BETWEEN 40 AND 41),
+    display_name TEXT NOT NULL CHECK(length(display_name) BETWEEN 1 AND 120),
+    mime_type TEXT NOT NULL CHECK(mime_type IN ('application/pdf','image/png','image/jpeg','image/webp','text/plain')),
+    size_bytes INTEGER NOT NULL CHECK(size_bytes BETWEEN 1 AND 5242880),
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX lesson_attachments_lesson_idx ON lesson_attachments(lesson_id, id);
+  CREATE TABLE attachment_trash (
+    file_name TEXT PRIMARY KEY,
+    queued_at INTEGER NOT NULL
+  ) WITHOUT ROWID;
+  CREATE TRIGGER lesson_attachments_to_trash AFTER DELETE ON lesson_attachments BEGIN
+    INSERT OR IGNORE INTO attachment_trash (file_name, queued_at) VALUES (old.file_name, CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+  END;
+`;
+
 /**
  * Derives the v4 series state for data written before v4 (migration and restore of a
  * v3 backup). The series template takes teacher/planned content from the earliest
@@ -174,6 +200,7 @@ export async function migrate(db: MigrationDatabase): Promise<number> {
       await deriveSeriesState(db);
     }
     if (current < 5) await db.execAsync(V5);
+    if (current < 6) await db.execAsync(V6);
     await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   });
   return SCHEMA_VERSION;
