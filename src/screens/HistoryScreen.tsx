@@ -3,14 +3,16 @@ import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, TextInput, Vi
 import { useSQLiteContext } from 'expo-sqlite';
 import { Chip } from '../components/Chip';
 import { ErrorText } from '../components/ErrorText';
+import { Field } from '../components/Field';
 import { LessonCard } from '../components/LessonCard';
-import { MAX_SEARCH_LENGTH, toLocalDate } from '../features/lessons/domain';
+import { MAX_SEARCH_LENGTH, formatTemplate, toLocalDate, validateDateRange } from '../features/lessons/domain';
 import { listHistoryPage, updateAttendance } from '../features/lessons/repository';
 import type { Attendance, Lesson } from '../features/lessons/types';
 import { listSubjects } from '../features/subjects/repository';
 import type { Subject } from '../features/subjects/repository';
 import { shortDate } from '../lib/format';
 import { useApp } from '../theme/AppContext';
+import { RANGE_ERRORS } from './BreakModal';
 
 const PAGE_SIZE = 30;
 const SEARCH_DELAY_MS = 300;
@@ -30,6 +32,11 @@ export function HistoryScreen({ revision, onOpen }: HistoryScreenProps) {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [showPeriod, setShowPeriod] = useState(false);
+  const [fromInput, setFromInput] = useState('');
+  const [toInput, setToInput] = useState('');
+  const [period, setPeriod] = useState<{ from: string | null; to: string | null }>({ from: null, to: null });
+  const [periodError, setPeriodError] = useState('');
   const requestId = useRef(0);
   const historyError = t.historyError;
 
@@ -38,21 +45,35 @@ export function HistoryScreen({ revision, onOpen }: HistoryScreenProps) {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  // The period applies only once both typed ends are valid (or empty = open).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const range = validateDateRange(fromInput, toInput, { required: false });
+      if (!range.ok) { setPeriodError(t[RANGE_ERRORS[range.error]]); return; }
+      setPeriodError('');
+      setPeriod((current) => (current.from === range.value.from && current.to === range.value.to ? current : range.value));
+    }, SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [fromInput, toInput, t]);
+
   useEffect(() => {
     listSubjects(db, { includeArchived: true }).then(setSubjects).catch(() => setSubjects([]));
   }, [db, revision]);
 
   const loadPage = useCallback(async (after: Lesson | null) => {
     const id = ++requestId.current;
+    const today = toLocalDate(new Date());
     const page = await listHistoryPage(db, {
       before: after && { localDate: after.localDate, startMinute: after.startMinute, id: after.id },
-      onOrBefore: toLocalDate(new Date()),
+      // History never shows future lessons, even when the period ends later.
+      onOrBefore: period.to !== null && period.to < today ? period.to : today,
+      onOrAfter: period.from,
       subjectId,
       search,
       limit: PAGE_SIZE,
     });
     return { page, current: id === requestId.current };
-  }, [db, search, subjectId]);
+  }, [db, search, subjectId, period]);
 
   useEffect(() => {
     let active = true;
@@ -120,6 +141,24 @@ export function HistoryScreen({ revision, onOpen }: HistoryScreenProps) {
           </ScrollView>
         </View>
       )}
+      <View style={[styles.chipRow, { marginBottom: 4 }]}>
+        <Chip
+          label={period.from || period.to ? formatTemplate(t.periodActive, { from: period.from ? shortDate(period.from, language) : '…', to: period.to ? shortDate(period.to, language) : '…' }) : t.periodFilter}
+          selected={showPeriod || period.from !== null || period.to !== null}
+          accessibilityLabel={t.periodFilter}
+          onPress={() => setShowPeriod((value) => !value)}
+        />
+        {(period.from !== null || period.to !== null || !!fromInput || !!toInput) && (
+          <Chip label={t.periodClear} onPress={() => { setFromInput(''); setToInput(''); setPeriodError(''); setPeriod({ from: null, to: null }); }} />
+        )}
+      </View>
+      {showPeriod && (
+        <View style={styles.formRow}>
+          <Field label={t.breakFrom} value={fromInput} onChangeText={setFromInput} placeholder="2026-09-01" keyboardType="numbers-and-punctuation" maxLength={10} />
+          <Field label={t.breakTo} value={toInput} onChangeText={setToInput} placeholder="2026-09-30" keyboardType="numbers-and-punctuation" maxLength={10} />
+        </View>
+      )}
+      <ErrorText message={periodError} />
       <ErrorText message={error} />
       {loading && items.length === 0 ? <ActivityIndicator color={palette.accent} style={{ marginTop: 24 }} /> : (
         <FlatList

@@ -117,11 +117,11 @@ describe('history pagination and search', () => {
     await createLesson(db, lesson({ localDate: '2026-12-01' })); // future: not history
   }
 
-  async function collect(query: { subjectId?: number | null; search?: string; limit: number }) {
+  async function collect(query: { subjectId?: number | null; search?: string; limit: number; from?: string; to?: string }) {
     const pages: Lesson[][] = [];
     let before = null as Lesson | null;
     for (let i = 0; i < 20; i += 1) {
-      const page = await listHistoryPage(db, { before: before && { localDate: before.localDate, startMinute: before.startMinute, id: before.id }, onOrBefore: '2026-10-20', subjectId: query.subjectId ?? null, search: query.search ?? '', limit: query.limit });
+      const page = await listHistoryPage(db, { before: before && { localDate: before.localDate, startMinute: before.startMinute, id: before.id }, onOrBefore: query.to ?? '2026-10-20', onOrAfter: query.from ?? null, subjectId: query.subjectId ?? null, search: query.search ?? '', limit: query.limit });
       if (page.length === 0) break;
       pages.push(page);
       before = page[page.length - 1];
@@ -156,6 +156,19 @@ describe('history pagination and search', () => {
     assert.equal((await collect({ search: 'QUIMICA', limit: 50 })).flat().length, 4);
     assert.deepEqual((await collect({ search: 'TOPICO 7', limit: 50 })).flat().map((item) => item.localDate), ['2026-10-07']);
     assert.equal((await collect({ search: 'Física', limit: 50 })).flat().length, 5);
+  });
+
+  it('filters by period combined with subject and search, keeping cursor pages', async () => {
+    await seed();
+    const dates = async (query: Parameters<typeof collect>[0]) => (await collect(query)).flat().map((item) => `${item.localDate}@${item.startMinute}`);
+    // Inclusive bounds; pages of 2 cross the two lessons on 5 Oct without duplicates.
+    assert.deepEqual(await dates({ from: '2026-10-04', to: '2026-10-06', limit: 2 }), ['2026-10-06@900', '2026-10-05@900', '2026-10-05@600', '2026-10-04@900']);
+    const fisica = (await listSubjects(db, { includeArchived: true })).find((item) => item.name === 'Física');
+    assert.ok(fisica);
+    assert.deepEqual(await dates({ from: '2026-10-02', to: '2026-10-07', subjectId: fisica.id, limit: 1 }), ['2026-10-07@900', '2026-10-05@900', '2026-10-03@900']);
+    assert.deepEqual(await dates({ from: '2026-10-02', to: '2026-10-07', search: 'topico', limit: 1 }), ['2026-10-07@900', '2026-10-06@900', '2026-10-05@900', '2026-10-04@900', '2026-10-02@900']);
+    assert.deepEqual(await dates({ from: '2026-10-08', limit: 5 }), ['2026-10-09@900', '2026-10-08@900']);
+    assert.deepEqual(await dates({ from: '2026-11-01', limit: 5 }), []);
   });
 });
 

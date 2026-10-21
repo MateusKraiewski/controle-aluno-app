@@ -378,12 +378,14 @@ export async function listHistoryPage(db: SQLiteDatabase, query: HistoryQuery): 
     SELECT ${LESSON_COLUMNS}
     FROM lessons l JOIN subjects s ON s.id = l.subject_id
     WHERE l.local_date <= ?
+      AND (? IS NULL OR l.local_date >= ?)
       AND (? IS NULL OR l.subject_id = ?)
       AND (? IS NULL OR s.search_name LIKE ? ESCAPE '\\' OR l.search_text LIKE ? ESCAPE '\\')
       AND (? IS NULL OR (l.local_date, l.start_minute, l.id) < (?, ?, ?))
     ORDER BY l.local_date DESC, l.start_minute DESC, l.id DESC
     LIMIT ?`,
   query.onOrBefore,
+  query.onOrAfter ?? null, query.onOrAfter ?? null,
   query.subjectId, query.subjectId,
   pattern, pattern, pattern,
   before ? 1 : null, before?.localDate ?? null, before?.startMinute ?? null, before?.id ?? null,

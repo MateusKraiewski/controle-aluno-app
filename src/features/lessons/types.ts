@@ -68,6 +68,8 @@ export type HistoryQuery = {
   before: HistoryCursor | null;
   /** Only lessons on or before this local date (history = past and today). */
   onOrBefore: string;
+  /** Optional start of the period filter (inclusive); null/absent = no lower bound. */
+  onOrAfter?: string | null;
   subjectId: number | null;
   search: string;
   limit?: number;
