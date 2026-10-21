@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Chip } from '../components/Chip';
 import { ErrorText } from '../components/ErrorText';
@@ -50,7 +51,7 @@ function MonthBody({ initialDate, revision, onClose, onPickDay }: { initialDate:
   for (let index = 0; index < grid.days.length; index += 7) weeks.push(grid.days.slice(index, index + 7));
 
   return (
-    <SafeAreaView style={styles.modalSafe} accessibilityViewIsModal>
+    <SafeAreaProvider><SafeAreaView style={styles.modalSafe} accessibilityViewIsModal>
       <ScrollView contentContainerStyle={styles.form}>
         <ModalHeader eyebrow={t.monthEyebrow} title={monthLabel(month, language)} onClose={onClose} />
         <View style={styles.weekNav}>
@@ -90,6 +91,6 @@ function MonthBody({ initialDate, revision, onClose, onPickDay }: { initialDate:
         ))}
         <Text style={[styles.info, { marginTop: 14 }]}>{t.monthLegend}</Text>
       </ScrollView>
-    </SafeAreaView>
+    </SafeAreaView></SafeAreaProvider>
   );
 }

@@ -31,7 +31,7 @@ export function createStyles(colors: Palette) {
     pressed: { opacity: 0.7 },
     caption: { color: colors.muted, fontSize: 13, marginTop: 9, lineHeight: 19 },
     agenda: { paddingTop: 16, paddingBottom: 30 },
-    dayHeading: { color: colors.ink, fontSize: 14, fontWeight: '700', textTransform: 'capitalize', marginBottom: 9, marginTop: 7 },
+    dayHeading: { color: colors.ink, fontSize: 14, fontWeight: '700', marginBottom: 9, marginTop: 7 },
     lessonCard: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: 17, overflow: 'hidden', marginBottom: 10, borderWidth: 1, borderColor: colors.line },
     timeRail: { width: 4 }, railGreen: { backgroundColor: colors.green }, railOrange: { backgroundColor: colors.orange }, railMuted: { backgroundColor: colors.line },
     lessonMain: { flex: 1, padding: 14 },

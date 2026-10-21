@@ -9,7 +9,9 @@ function toDate(localDate: string): Date {
 
 /** "terça-feira, 20 de outubro" in the chosen app language. */
 export function prettyDate(localDate: string, language: Language): string {
-  return toDate(localDate).toLocaleDateString(language, { weekday: 'long', day: 'numeric', month: 'long' });
+  // Only the first letter: 'capitalize' styling would also turn 'de' into 'De'.
+  const text = toDate(localDate).toLocaleDateString(language, { weekday: 'long', day: 'numeric', month: 'long' });
+  return text.charAt(0).toLocaleUpperCase(language) + text.slice(1);
 }
 
 /** Compact date with year, for history rows and alerts. */

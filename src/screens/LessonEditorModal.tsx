@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { AttendancePicker } from '../components/AttendancePicker';
 import { Chip } from '../components/Chip';
@@ -329,7 +330,7 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
   const editLoaded = !isEdit || lesson !== null;
 
   return (
-    <SafeAreaView style={styles.modalSafe} accessibilityViewIsModal>
+    <SafeAreaProvider><SafeAreaView style={styles.modalSafe} accessibilityViewIsModal>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <ModalHeader eyebrow={isEdit ? t.editEyebrow : t.newOccurrence} title={isEdit ? t.editLesson : t.addLesson} onClose={onClose} />
@@ -445,6 +446,6 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SafeAreaView></SafeAreaProvider>
   );
 }
