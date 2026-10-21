@@ -7,6 +7,8 @@ import { MAX_BACKUP_CHARS, MAX_BACKUP_LESSONS, backupFileName, serializeBackup, 
 import type { BackupError, BackupSummary, ValidatedBackup } from '../features/backup/format';
 import { BackupTooLargeError, countLocalData, deleteAllData, exportBackup, restoreBackup } from '../features/backup/repository';
 import type { DataCounts } from '../features/backup/repository';
+import { purgeAttachmentTrash, removeAllAttachmentFiles } from '../features/attachments/files';
+import { countAttachments } from '../features/attachments/repository';
 import { buildHistoryCsv, historyCsvFileName } from '../features/export/csv';
 import type { HistoryCsvLabels } from '../features/export/csv';
 import { HistoryExportTooLargeError, MAX_CSV_LESSONS, readHistoryForCsv } from '../features/export/repository';
@@ -17,7 +19,7 @@ import type { Translations } from '../lib/locales';
 import { useApp } from '../theme/AppContext';
 
 type Busy = 'export' | 'csv' | 'check' | 'restore' | 'delete' | null;
-type Preview = { backup: ValidatedBackup; summary: BackupSummary; current: DataCounts };
+type Preview = { backup: ValidatedBackup; summary: BackupSummary; current: DataCounts; attachments: number };
 
 function backupErrorMessage(t: Translations, error: BackupError): string {
   const path = error.path ?? '';
@@ -103,7 +105,7 @@ export function DataSettings({ onChanged }: { onChanged: () => void }) {
     try {
       const result = validateBackup(text);
       if (!result.ok) { report('', backupErrorMessage(t, result.error)); return; }
-      setPreview({ backup: result.value, summary: summarizeBackup(result.value), current: await countLocalData(db) });
+      setPreview({ backup: result.value, summary: summarizeBackup(result.value), current: await countLocalData(db), attachments: (await countAttachments(db)).count });
     } catch {
       report('', t.restoreError);
     } finally {
@@ -124,11 +126,16 @@ export function DataSettings({ onChanged }: { onChanged: () => void }) {
 
   async function confirmRestore() {
     if (!preview) return;
-    const choice = await ask(t.restoreTitle, t.restoreBody, t.back, [{ label: t.confirmRestore, value: 'restore', destructive: true }]);
+    // A backup has no attachments: restoring replaces every lesson, so the current attachments go too.
+    const body = preview.attachments > 0 ? `${t.restoreBody}
+
+${formatTemplate(t.restoreAttachmentsNote, { count: preview.attachments })}` : t.restoreBody;
+    const choice = await ask(t.restoreTitle, body, t.back, [{ label: t.confirmRestore, value: 'restore', destructive: true }]);
     if (choice !== 'restore') return;
     setBusy('restore');
     try {
       const counts = await restoreBackup(db, preview.backup);
+      await purgeAttachmentTrash(db).catch(() => 0);
       setPreview(null);
       setSource('');
       setShowRestore(false);
@@ -144,13 +151,16 @@ export function DataSettings({ onChanged }: { onChanged: () => void }) {
   async function deleteEverything() {
     report('');
     let counts: DataCounts;
+    let attachments = 0;
     try {
       counts = await countLocalData(db);
+      attachments = (await countAttachments(db)).count;
     } catch {
       report('', t.deleteAllError);
       return;
     }
-    const first = await ask(t.deleteAllTitle, formatTemplate(t.deleteAllBody, { subjects: counts.subjects, lessons: counts.lessons }), t.back,
+    const summary = formatTemplate(t.deleteAllBody, { subjects: counts.subjects, lessons: counts.lessons });
+    const first = await ask(t.deleteAllTitle, attachments > 0 ? `${summary} ${formatTemplate(t.deleteAllAttachmentsNote, { count: attachments })}` : summary, t.back,
       [{ label: t.deleteAllContinue, value: 'continue' }]);
     if (first !== 'continue') return;
     const second = await ask(t.deleteAllConfirmTitle, t.deleteAllConfirmBody, t.back, [{ label: t.deleteAllConfirm, value: 'delete', destructive: true }]);
@@ -159,6 +169,8 @@ export function DataSettings({ onChanged }: { onChanged: () => void }) {
     try {
       await deleteAllData(db);
       try { clearExportFiles(); } catch { /* the cache file is removed by the OS or the next export */ }
+      // Rows are gone; the files folder goes too (anything left is retried on the next start).
+      await removeAllAttachmentFiles(db).catch(() => undefined);
       setPreview(null);
       report(t.deleteAllDone);
       onChanged();
@@ -238,6 +250,7 @@ export function DataSettings({ onChanged }: { onChanged: () => void }) {
                 })}
               </Text>
               <Text style={styles.rowMeta}>{formatTemplate(t.restoreReplaceNote, { subjects: preview.current.subjects, lessons: preview.current.lessons })}</Text>
+              {preview.attachments > 0 && <Text style={[styles.rowMeta, styles.warningText]}>{`⚠ ${formatTemplate(t.restoreAttachmentsNote, { count: preview.attachments })}`}</Text>}
               <Pressable accessibilityRole="button" accessibilityState={{ disabled, busy: busy === 'restore' }} disabled={disabled} onPress={() => void confirmRestore()}
                 style={({ pressed }) => [styles.dangerButton, pressed && styles.pressed, disabled && styles.disabled]}>
                 <Text style={styles.dangerButtonText}>{t.confirmRestore}</Text>

@@ -105,6 +105,8 @@ export function createStyles(colors: Palette) {
     monthOutside: { color: colors.muted, fontWeight: '400' },
     monthCount: { color: colors.onGreen, backgroundColor: colors.green, fontSize: 11, fontWeight: '800', minWidth: 20, textAlign: 'center', borderRadius: 10, overflow: 'hidden', marginTop: 4, paddingHorizontal: 5 },
     monthCountEmpty: { fontSize: 11, marginTop: 4 },
+    warningText: { color: colors.danger, fontWeight: '700' },
+    dangerText: { color: colors.danger },
     monthCancelled: { color: colors.danger, fontSize: 10, fontWeight: '700', marginTop: 2 },
   });
 }

@@ -17,11 +17,14 @@ import {
 } from '../features/lessons/repository';
 import type { Attendance, EditScope, Lesson, Scope, SeriesInfo } from '../features/lessons/types';
 import { listSubjects } from '../features/subjects/repository';
+import { purgeAttachmentTrash } from '../features/attachments/files';
+import { countAttachmentsAffectedByDelete } from '../features/attachments/repository';
 import { ask } from '../lib/dialogs';
 import { shortDate } from '../lib/format';
 import type { TranslationKey } from '../lib/locales';
 import { weekdayLabel } from '../lib/locales';
 import { useApp } from '../theme/AppContext';
+import { LessonAttachments } from './LessonAttachments';
 import { LessonObjectives } from './LessonObjectives';
 
 export type EditorTarget = { mode: 'create'; localDate: string } | { mode: 'edit'; id: number };
@@ -301,11 +304,18 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
 
   async function remove() {
     if (!lesson) return;
-    const scope = await chooseScope(t.deleteTitle, lesson.seriesId === null ? t.deleteBody : t.deleteSeriesBody, true);
+    let body = lesson.seriesId === null ? t.deleteBody : t.deleteSeriesBody;
+    const attachments = await countAttachmentsAffectedByDelete(db, lesson.id).catch(() => 0);
+    if (attachments > 0) body = `${body}
+
+${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
+    const scope = await chooseScope(t.deleteTitle, body, true);
     if (!scope) return;
     setBusy(true);
     try {
       await deleteLessons(db, lesson.id, scope);
+      // Rows are gone and their files queued; removing the files now is best effort.
+      await purgeAttachmentTrash(db).catch(() => 0);
       onChanged();
       onClose();
     } catch {
@@ -344,6 +354,7 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
                   <Field label={t.nextStep} value={nextStep} onChangeText={setNextStep} placeholder={t.nextStepPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
                   <Field label={t.privateNotes} value={privateNotes} onChangeText={setPrivateNotes} placeholder={t.privateNotesPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
                   {lesson && <LessonObjectives lessonId={lesson.id} subjectId={lesson.subjectId} onChanged={onChanged} />}
+                  {lesson && <LessonAttachments lessonId={lesson.id} />}
                 </>
               )}
 
