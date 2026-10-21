@@ -15,10 +15,23 @@
 - ✅ Recorrências semanais/quinzenais, exceções por feriado, e edição de uma/todas — editar “só esta” ou “todas as futuras” (só ocorrências futuras, planeadas, sem registos e não editadas à parte), mudar a data final (estender idempotente / encurtar só futuras intactas), feriado/pausa por período, cancelar/excluir “esta e as seguintes”. Mudar dias da semana ou frequência de uma série existente continua fora do escopo (criar nova repetição).
 - ✅ Registo posterior de conteúdo realmente estudado, apontamentos privados, tarefa/revisão (“próximo passo”) e estado da aula, separados do plano.
 - ✅ Histórico com filtro por matéria/período, busca local (inclui apontamentos e próximo passo) e paginação por cursor composto.
-- ✅ Exportar/restaurar cópia local (JSON versionado v4, aceita v3, validação estrita, substituição total numa transação) e eliminar todos os dados por iniciativa do aluno (confirmação em dois passos).
+- ✅ Exportar/restaurar cópia local (JSON versionado, hoje v5, aceita v3 e v4, validação estrita, substituição total numa transação) e eliminar todos os dados por iniciativa do aluno (confirmação em dois passos).
 - ○ Seletores nativos de data/hora (hoje: texto validado `AAAA-MM-DD`/`HH:MM`).
 
-**Aceite pendente:** executar o checklist “Testes manuais da Fase 1” de `docs/qa-mobile.md` em Android e iPhone (ou emuladores), incluindo atualização a partir de bases v1/v2/v3.
+**Aceite pendente:** executar o checklist “Testes manuais da Fase 1” de `docs/qa-mobile.md` em Android e iPhone (ou emuladores), incluindo atualização a partir de bases v1/v2/v3/v4.
+
+## Fase 1b — apoio à aprendizagem (offline)
+
+**Código completo, sem ensaio em aparelho.** Tudo local, coberto por testes em `node:sqlite`; nada ensaiado em Android ou iPhone.
+
+- ✅ Objetivos de aprendizagem por matéria (título até 200 caracteres, estado aberto/praticando/concluído escolhido pelo aluno, datas de criação/atualização), esquema v5 aditivo.
+- ✅ Marcar no editor da aula quais objetivos foram trabalhados (só objetivos da matéria da aula).
+- ✅ Sugestões de revisão explicáveis calculadas por uma função pura testada (≥ 21 dias sem trabalhar um objetivo não concluído, com a data de origem), dispensáveis e persistentes; nunca inferem notas ou desempenho.
+- ✅ Exportar o histórico em CSV pela folha de partilha (apontamentos privados só por opção), com escape RFC 4180 e proteção contra injeção de fórmulas.
+- ✅ Cópia de segurança v5 com objetivos, marcas e dispensas (aceita v3 e v4).
+- ○ Apagar/reordenar objetivos; separador “;” opcional no CSV.
+
+**Aceite pendente:** checklist “Testes manuais do apoio à aprendizagem” (itens 26–31) de `docs/qa-mobile.md` em Android e iPhone.
 
 ## Fase 2 — confiabilidade e acessibilidade
 
@@ -36,4 +49,4 @@
 
 ## Não fazer na fundação
 
-Vídeo, chat, pagamento, feeds, pontuação escolar automática, telemetria com conteúdo de aula, backup implícito de terceiros ou sync bidirecional sem consentimento. Evitar bibliotecas pesadas até haver um requisito concreto e medição que justifique o custo.
+Vídeo, chat, pagamento, feeds, pontuação escolar automática (as sugestões de revisão só usam datas, nunca notas ou desempenho), telemetria com conteúdo de aula, backup implícito de terceiros ou sync bidirecional sem consentimento. Evitar bibliotecas pesadas até haver um requisito concreto e medição que justifique o custo.

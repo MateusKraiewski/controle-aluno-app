@@ -30,7 +30,7 @@ Use `a` para abrir num emulador Android, ou leia o QR com Expo Go. A app abre na
 - [Checklist QA móvel](docs/qa-mobile.md)
 - Continuação da visão aluno/professor: [produto original](https://github.com/MateusKraiewski/controle-aluno/blob/main/PRODUCT.md)
 
-## Estado atual (código da Fase 1 completo, sem ensaio em aparelho)
+## Estado atual (código da Fase 1 e do apoio à aprendizagem completo, sem ensaio em aparelho)
 
 Implementado no código e coberto por TypeScript, testes automáticos em Node e bundle Android/iOS — **ainda não executado num aparelho ou emulador**:
 
@@ -45,17 +45,20 @@ Implementado no código e coberto por TypeScript, testes automáticos em Node e 
 - Aviso de sobreposição no mesmo dia antes de guardar, com opção de guardar mesmo assim.
 - Histórico (aulas até hoje) com paginação por cursor, “Carregar mais”, filtro por matéria e por período, e pesquisa local que ignora acentos e maiúsculas (“FISICA” encontra “Física”), incluindo apontamentos e próximo passo.
 - Matérias: renomear (nome único sem diferenciar maiúsculas), arquivar/reativar sem apagar aulas, cor de uma paleta acessível (sempre acompanhada do nome) e ordem manual, usadas na agenda, histórico e filtros.
+- Objetivos de aprendizagem por matéria (Matérias → “Objetivos”): adicionar, renomear e escolher Aberto/Praticando/Concluído; ver a data do último trabalho. No editor da aula, marcar quais objetivos foram trabalhados.
+- Sugestões de revisão calculadas no aparelho (ex.: “Há 3 semanas sem rever X”, com a data da última aula como fonte), dispensáveis; usam só datas registadas, nunca notas ou desempenho.
+- Exportar o histórico em CSV (Definições → Os seus dados) pela folha de partilha; apontamentos privados só se marcar a opção.
 - Português do Brasil/Portugal, inglês, espanhol e tema sistema/claro/escuro, guardados localmente.
-- Definições → Os seus dados: exportar cópia de segurança JSON versionada (v4; aceita restaurar cópias v3) pela folha de partilha do sistema; restaurar a partir de JSON colado ou ficheiro escolhido, com validação estrita, pré-visualização de contagens, confirmação e substituição total numa única transação (ou nada muda); apagar todos os dados com confirmação em dois passos.
-- SQLite com esquema v4 (migrações aditivas v1→v2→v3→v4 testadas, incluindo backfill da pesquisa e derivação do estado das séries), transações, WAL, índices e limites de consulta.
+- Definições → Os seus dados: exportar cópia de segurança JSON versionada (v5, com objetivos; aceita restaurar cópias v3 e v4) pela folha de partilha do sistema; restaurar a partir de JSON colado ou ficheiro escolhido, com validação estrita, pré-visualização de contagens, confirmação e substituição total numa única transação (ou nada muda); apagar todos os dados com confirmação em dois passos.
+- SQLite com esquema v5 (migrações aditivas v1→v2→v3→v4→v5 testadas, incluindo backfill da pesquisa, derivação do estado das séries e tabelas de objetivos), transações, WAL, índices e limites de consulta.
 
-Ainda não implementado: seletores nativos de data/hora, mudar dias/frequência de uma repetição existente, aviso de sobreposição ao estender uma repetição, cifra local e cópia de segurança automática. Nada foi ensaiado num aparelho ou emulador. Detalhes em `docs/offline-first.md` e `docs/progress.md`.
+Ainda não implementado: apagar objetivos, separador “;” no CSV, seletores nativos de data/hora, mudar dias/frequência de uma repetição existente, aviso de sobreposição ao estender uma repetição, cifra local e cópia de segurança automática. Nada foi ensaiado num aparelho ou emulador. Detalhes em `docs/offline-first.md` e `docs/progress.md`.
 
 ## Testes
 
 ```sh
 npm run typecheck   # app + ficheiros de teste
-npm test            # node --test (68 casos): domínio, séries, feriados, pesquisa, migrações v1→v4, repositórios e cópia de segurança em node:sqlite
+npm test            # node --test (91 casos): domínio, séries, feriados, pesquisa, migrações v1→v5, objetivos, sugestões, CSV, repositórios e cópia de segurança em node:sqlite
 npx expo-doctor
 npx expo export --platform android --platform ios --output-dir <pasta-temporária>
 ```
