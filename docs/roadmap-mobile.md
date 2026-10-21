@@ -15,10 +15,10 @@
 - ✅ Recorrências semanais/quinzenais, exceções por feriado, e edição de uma/todas — editar “só esta” ou “todas as futuras” (só ocorrências futuras, planeadas, sem registos e não editadas à parte), mudar a data final (estender idempotente / encurtar só futuras intactas), feriado/pausa por período, cancelar/excluir “esta e as seguintes”. Mudar dias da semana ou frequência de uma série existente continua fora do escopo (criar nova repetição).
 - ✅ Registo posterior de conteúdo realmente estudado, apontamentos privados, tarefa/revisão (“próximo passo”) e estado da aula, separados do plano.
 - ✅ Histórico com filtro por matéria/período, busca local (inclui apontamentos e próximo passo) e paginação por cursor composto.
-- ✅ Exportar/restaurar cópia local (JSON versionado, hoje v5, aceita v3 e v4, validação estrita, substituição total numa transação) e eliminar todos os dados por iniciativa do aluno (confirmação em dois passos).
+- ✅ Exportar/restaurar cópia local (JSON versionado, formato v5 independente do esquema SQLite e sem anexos, aceita v3 e v4, validação estrita, substituição total numa transação) e eliminar todos os dados por iniciativa do aluno (confirmação em dois passos).
 - ○ Seletores nativos de data/hora (hoje: texto validado `AAAA-MM-DD`/`HH:MM`).
 
-**Aceite pendente:** executar o checklist “Testes manuais da Fase 1” de `docs/qa-mobile.md` em Android e iPhone (ou emuladores), incluindo atualização a partir de bases v1/v2/v3/v4.
+**Aceite pendente:** executar o checklist “Testes manuais da Fase 1” de `docs/qa-mobile.md` em Android e iPhone (ou emuladores), incluindo atualização a partir de bases v1/v2/v3/v4/v5.
 
 ## Fase 1b — apoio à aprendizagem (offline)
 
@@ -33,9 +33,23 @@
 
 **Aceite pendente:** checklist “Testes manuais do apoio à aprendizagem” (itens 26–31) de `docs/qa-mobile.md` em Android e iPhone.
 
+## Fase 1c — anexos de aula (offline)
+
+**Código completo, sem ensaio em aparelho.** Coberto por testes em `node:sqlite` (regras e repositório); o seletor, a cópia de ficheiros e a partilha não foram executados.
+
+- ✅ Anexar PDF, imagem (PNG/JPEG/WebP) ou texto a uma aula guardada (`expo-document-picker`), até 5 MB e 10 por aula, tipo detetado pelos bytes mágicos e nome sanitizado.
+- ✅ Ficheiros no diretório de documentos da app com nomes UUID; SQLite só com metadados (esquema v6 aditivo).
+- ✅ Abrir/partilhar pela folha de partilha; remover com confirmação; “Arquivo indisponível” quando o ficheiro falta.
+- ✅ Apagar anexo, aula, série (“esta e as seguintes”), restauro e eliminação total removem os ficheiros por uma fila transacional (`attachment_trash`) retomada no arranque; ficheiros órfãos de uma cópia interrompida são limpos.
+- ✅ Política de cópia explícita: a cópia JSON não inclui anexos (nem metadados); formato de cópia continua v5.
+- ○ Miniaturas, câmara, vários ficheiros de uma vez e incluir anexos numa futura cópia cifrada.
+
+**Aceite pendente:** checklist “Testes manuais dos anexos” (itens 32–42) de `docs/qa-mobile.md` em Android e iPhone.
+
 ## Fase 2 — confiabilidade e acessibilidade
 
 - Testes de repositório em SQLite temporário e migração de versões anteriores — ◐ feitos em `node:sqlite` (`npm test`); falta repetir com o SQLite do expo-sqlite em aparelho.
+- Revisão de acessibilidade no código — ◐ feita em 21/10/2026 (alvos 44×44, estados sem depender da cor, papéis/rótulos/estados, modais, movimento reduzido; lista do que ficou por corrigir em `docs/qa-mobile.md`); falta ensaio com TalkBack/VoiceOver e texto grande (itens 43–47).
 - Android e iPhone: modo avião, persistência após reinício, datas locais, teclado, leitor de ecrã, tamanhos de texto e orientação.
 - Conjunto de stress de anos de aulas; medir memória, tamanho do banco e tempo de consulta em aparelhos de entrada.
 - Revisão de proteção de ficheiros e de backup do sistema operativo; documentar recuperação e exportação.

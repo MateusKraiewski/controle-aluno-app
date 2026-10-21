@@ -30,7 +30,7 @@ Use `a` para abrir num emulador Android, ou leia o QR com Expo Go. A app abre na
 - [Checklist QA móvel](docs/qa-mobile.md)
 - Continuação da visão aluno/professor: [produto original](https://github.com/MateusKraiewski/controle-aluno/blob/main/PRODUCT.md)
 
-## Estado atual (código da Fase 1 e do apoio à aprendizagem completo, sem ensaio em aparelho)
+## Estado atual (código da Fase 1, do apoio à aprendizagem e dos anexos completo, sem ensaio em aparelho)
 
 Implementado no código e coberto por TypeScript, testes automáticos em Node e bundle Android/iOS — **ainda não executado num aparelho ou emulador**:
 
@@ -48,17 +48,19 @@ Implementado no código e coberto por TypeScript, testes automáticos em Node e 
 - Objetivos de aprendizagem por matéria (Matérias → “Objetivos”): adicionar, renomear e escolher Aberto/Praticando/Concluído; ver a data do último trabalho. No editor da aula, marcar quais objetivos foram trabalhados.
 - Sugestões de revisão calculadas no aparelho (ex.: “Há 3 semanas sem rever X”, com a data da última aula como fonte), dispensáveis; usam só datas registadas, nunca notas ou desempenho.
 - Exportar o histórico em CSV (Definições → Os seus dados) pela folha de partilha; apontamentos privados só se marcar a opção.
+- Anexos de aula (no editor de uma aula guardada): PDF, imagem PNG/JPEG/WebP ou texto simples, até 5 MB cada e 10 por aula, escolhidos com `expo-document-picker`. O tipo é detetado pelo conteúdo (bytes mágicos), o nome é sanitizado e o ficheiro é copiado para a pasta privada da app com nome UUID; o SQLite guarda só metadados. Abrir/partilhar pela folha de partilha; remover com confirmação; um ficheiro em falta aparece como “Arquivo indisponível”. Excluir aulas, restaurar uma cópia e apagar tudo removem os ficheiros por uma fila que sobrevive a um crash. **A cópia de segurança JSON não inclui anexos** (nem metadados) e restaurar apaga os anexos atuais (o alerta avisa).
+- Acessibilidade revista no código: alvos de toque de 44×44, estados selecionados com “✓” (não só cor), papéis, rótulos e estados em todos os controlos, modais sem animação quando o sistema pede movimento reduzido. Ainda sem ensaio com TalkBack/VoiceOver.
 - Português do Brasil/Portugal, inglês, espanhol e tema sistema/claro/escuro, guardados localmente.
-- Definições → Os seus dados: exportar cópia de segurança JSON versionada (v5, com objetivos; aceita restaurar cópias v3 e v4) pela folha de partilha do sistema; restaurar a partir de JSON colado ou ficheiro escolhido, com validação estrita, pré-visualização de contagens, confirmação e substituição total numa única transação (ou nada muda); apagar todos os dados com confirmação em dois passos.
-- SQLite com esquema v5 (migrações aditivas v1→v2→v3→v4→v5 testadas, incluindo backfill da pesquisa, derivação do estado das séries e tabelas de objetivos), transações, WAL, índices e limites de consulta.
+- Definições → Os seus dados: exportar cópia de segurança JSON versionada (formato v5, com objetivos e sem anexos; aceita restaurar cópias v3 e v4) pela folha de partilha do sistema; restaurar a partir de JSON colado ou ficheiro escolhido, com validação estrita, pré-visualização de contagens, confirmação e substituição total numa única transação (ou nada muda); apagar todos os dados com confirmação em dois passos.
+- SQLite com esquema v6 (migrações aditivas v1→v2→v3→v4→v5→v6 testadas, incluindo backfill da pesquisa, derivação do estado das séries, tabelas de objetivos e de metadados de anexos com fila de remoção), transações, WAL, índices e limites de consulta.
 
-Ainda não implementado: apagar objetivos, separador “;” no CSV, seletores nativos de data/hora, mudar dias/frequência de uma repetição existente, aviso de sobreposição ao estender uma repetição, cifra local e cópia de segurança automática. Nada foi ensaiado num aparelho ou emulador. Detalhes em `docs/offline-first.md` e `docs/progress.md`.
+Ainda não implementado: apagar objetivos, separador “;” no CSV, miniaturas/câmara nos anexos, anexos na cópia de segurança, seletores nativos de data/hora, mudar dias/frequência de uma repetição existente, aviso de sobreposição ao estender uma repetição, cifra local e cópia de segurança automática. Nada foi ensaiado num aparelho ou emulador. Detalhes em `docs/offline-first.md` e `docs/progress.md`.
 
 ## Testes
 
 ```sh
 npm run typecheck   # app + ficheiros de teste
-npm test            # node --test (91 casos): domínio, séries, feriados, pesquisa, migrações v1→v5, objetivos, sugestões, CSV, repositórios e cópia de segurança em node:sqlite
+npm test            # node --test (112 casos): domínio, séries, feriados, pesquisa, migrações v1→v6, objetivos, sugestões, CSV, anexos, repositórios e cópia de segurança em node:sqlite
 npx expo-doctor
 npx expo export --platform android --platform ios --output-dir <pasta-temporária>
 ```
