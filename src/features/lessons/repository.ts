@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { lessonSearchText, normalizeForSearch } from '../../lib/text';
+import { isSubjectColor } from '../subjects/colors';
 import { MAX_OCCURRENCES, addDays, maskToWeekdays, planSeriesEnd, toMoment, toSearchPattern } from './domain';
 import type { Moment, Result, SeriesEndError, TimeSlot } from './domain';
 import type { Attendance, EditScope, HistoryQuery, Lesson, LessonStatus, LessonUpdate, NewLesson, NewSeries, Scope, SeriesInfo } from './types';
@@ -23,13 +24,14 @@ type LessonRow = {
   cancel_reason: string | null;
   series_id: number | null;
   series_exception: number;
+  subject_color: string | null;
   created_at: number;
   updated_at: number | null;
 };
 
 const LESSON_COLUMNS = `l.id, l.subject_id, s.name AS subject, l.teacher_name, l.local_date, l.start_minute,
   l.duration_minutes, l.planned_content, l.studied_content, l.attendance, l.status, l.cancel_reason,
-  l.series_id, l.series_exception, l.created_at, l.updated_at`;
+  l.series_id, l.series_exception, l.created_at, l.updated_at, s.color AS subject_color`;
 
 /**
  * Occurrences a series-wide change may touch: still planned, nothing recorded
@@ -46,6 +48,7 @@ function toLesson(row: LessonRow): Lesson {
     startMinute: row.start_minute, durationMinutes: row.duration_minutes, plannedContent: row.planned_content,
     studiedContent: row.studied_content, attendance: row.attendance, status: row.status, cancelReason: row.cancel_reason,
     seriesId: row.series_id, seriesException: row.series_exception === 1, createdAt: row.created_at, updatedAt: row.updated_at,
+    subjectColor: isSubjectColor(row.subject_color) ? row.subject_color : null,
   };
 }
 

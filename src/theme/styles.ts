@@ -93,5 +93,9 @@ export function createStyles(colors: Palette) {
     rowActions: { flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' },
     searchInput: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 13, minHeight: 46, paddingHorizontal: 13, color: colors.ink, fontSize: 14, marginTop: 14 },
     filterRow: { gap: 7, paddingVertical: 12 },
+    colorChip: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    swatch: { width: 14, height: 14, borderRadius: 7 },
+    swatchEmpty: { borderWidth: 1, borderColor: colors.muted },
+    subjectTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   });
 }

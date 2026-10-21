@@ -9,7 +9,7 @@ import {
   cancelLessons, createLesson, createLessonSeries, deleteLessons, getLesson, listHistoryPage, listLessonsInRange,
   listTimeSlots, restoreLesson, updateAttendance, updateLesson,
 } from './repository';
-import { listSubjects, renameSubject, setSubjectArchived } from '../subjects/repository';
+import { listSubjects, moveSubject, renameSubject, setSubjectArchived, setSubjectColor } from '../subjects/repository';
 import type { Lesson } from './types';
 
 let db: SQLiteDatabase;
@@ -215,5 +215,35 @@ describe('subjects repository', () => {
     // Using an archived subject again restores it.
     await createLesson(db, lesson({ subject: 'história' }));
     assert.equal((await listSubjects(db, { includeArchived: false })).length, 2);
+  });
+});
+
+describe('subject colour and manual order', () => {
+  it('stores a palette colour shown on lessons and refuses unknown colours', async () => {
+    await createLesson(db, lesson({ subject: 'Física' }));
+    const [fisica] = await listSubjects(db, { includeArchived: false });
+    await setSubjectColor(db, fisica.id, 'blue');
+    assert.equal((await listSubjects(db, { includeArchived: false }))[0].color, 'blue');
+    assert.equal((await listLessonsInRange(db, '2026-10-19', '2026-10-26'))[0].subjectColor, 'blue');
+    await assert.rejects(setSubjectColor(db, fisica.id, '#ff0000' as never), RangeError);
+    await setSubjectColor(db, fisica.id, null);
+    assert.equal((await listLessonsInRange(db, '2026-10-19', '2026-10-26'))[0].subjectColor, null);
+  });
+
+  it('moves subjects within their group and keeps new ones after, by name', async () => {
+    for (const subject of ['Química', 'Artes', 'Física', 'Biologia']) await createLesson(db, lesson({ subject }));
+    const names = async () => (await listSubjects(db, { includeArchived: true })).map((item) => item.name);
+    const id = async (name: string) => (await listSubjects(db, { includeArchived: true })).find((item) => item.name === name)!.id;
+    assert.deepEqual(await names(), ['Artes', 'Biologia', 'Física', 'Química']);
+    assert.equal(await moveSubject(db, await id('Química'), 'up'), true);
+    assert.equal(await moveSubject(db, await id('Química'), 'up'), true);
+    assert.deepEqual(await names(), ['Artes', 'Química', 'Biologia', 'Física']);
+    assert.equal(await moveSubject(db, await id('Artes'), 'up'), false); // already first
+    await setSubjectArchived(db, await id('Física'), true);
+    assert.equal(await moveSubject(db, await id('Biologia'), 'down'), false); // never crosses into archived
+    await createLesson(db, lesson({ subject: 'Alemão' }));
+    assert.deepEqual(await names(), ['Artes', 'Química', 'Biologia', 'Alemão', 'Física']);
+    // History filter chips use the same order.
+    assert.deepEqual((await listSubjects(db, { includeArchived: false })).map((item) => item.name), ['Artes', 'Química', 'Biologia', 'Alemão']);
   });
 });

@@ -15,12 +15,16 @@ type LessonCardProps = {
 };
 
 export const LessonCard = memo(function LessonCard({ lesson, accentIndex, onOpen, onAttendance, dateLabel }: LessonCardProps) {
-  const { styles, t } = useApp();
+  const { styles, t, palette } = useApp();
   const cancelled = lesson.status === 'cancelled';
   const time = formatTime(lesson.startMinute);
+  // The subject colour is a decorative rail next to the subject name, never the only cue.
+  const rail = cancelled ? styles.railMuted
+    : lesson.subjectColor ? { backgroundColor: palette.subject[lesson.subjectColor] }
+      : accentIndex % 2 ? styles.railOrange : styles.railGreen;
   return (
     <View style={styles.lessonCard}>
-      <View style={[styles.timeRail, cancelled ? styles.railMuted : accentIndex % 2 ? styles.railOrange : styles.railGreen]} />
+      <View style={[styles.timeRail, rail]} />
       <View style={styles.lessonMain}>
         <Pressable
           accessibilityRole="button"

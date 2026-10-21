@@ -1,3 +1,4 @@
+import type { SubjectColor } from '../subjects/colors';
 import type { Frequency } from './domain';
 
 export type Attendance = 'unmarked' | 'attended' | 'absent';
@@ -7,6 +8,8 @@ export type Lesson = {
   id: number;
   subjectId: number;
   subject: string;
+  /** Colour key chosen for the subject (always shown next to its name). */
+  subjectColor: SubjectColor | null;
   teacher: string | null;
   localDate: string;
   startMinute: number;
