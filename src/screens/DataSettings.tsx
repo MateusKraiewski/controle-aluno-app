@@ -2,18 +2,21 @@ import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { ErrorText } from '../components/ErrorText';
-import { BackupFileTooLargeError, clearExportFiles, pickBackupText, shareBackupFile } from '../features/backup/files';
+import { BackupFileTooLargeError, clearExportFiles, pickBackupText, shareBackupFile, shareCsvFile } from '../features/backup/files';
 import { MAX_BACKUP_CHARS, MAX_BACKUP_LESSONS, backupFileName, serializeBackup, summarizeBackup, validateBackup } from '../features/backup/format';
 import type { BackupError, BackupSummary, ValidatedBackup } from '../features/backup/format';
 import { BackupTooLargeError, countLocalData, deleteAllData, exportBackup, restoreBackup } from '../features/backup/repository';
 import type { DataCounts } from '../features/backup/repository';
-import { formatTemplate } from '../features/lessons/domain';
+import { buildHistoryCsv, historyCsvFileName } from '../features/export/csv';
+import type { HistoryCsvLabels } from '../features/export/csv';
+import { HistoryExportTooLargeError, MAX_CSV_LESSONS, readHistoryForCsv } from '../features/export/repository';
+import { formatTemplate, toLocalDate } from '../features/lessons/domain';
 import { ask } from '../lib/dialogs';
 import { dateTime } from '../lib/format';
 import type { Translations } from '../lib/locales';
 import { useApp } from '../theme/AppContext';
 
-type Busy = 'export' | 'check' | 'restore' | 'delete' | null;
+type Busy = 'export' | 'csv' | 'check' | 'restore' | 'delete' | null;
 type Preview = { backup: ValidatedBackup; summary: BackupSummary; current: DataCounts };
 
 function backupErrorMessage(t: Translations, error: BackupError): string {
@@ -33,7 +36,16 @@ function backupErrorMessage(t: Translations, error: BackupError): string {
   }
 }
 
-/** Export, restore and erase of the student's local data (settings screen). */
+function csvLabels(t: Translations): HistoryCsvLabels {
+  return {
+    date: t.csvColDate, start: t.csvColStart, end: t.csvColEnd, subject: t.csvColSubject, status: t.csvColStatus,
+    attendance: t.csvColAttendance, planned: t.csvColPlanned, studied: t.csvColStudied, nextStep: t.csvColNextStep,
+    privateNotes: t.csvColNotes, statusPlanned: t.csvStatusPlanned, statusCancelled: t.cancelled,
+    attendanceUnmarked: t.pending, attendanceAttended: t.attended, attendanceAbsent: t.absent,
+  };
+}
+
+/** Export (JSON backup, CSV history), restore and erase of the student's local data (settings screen). */
 export function DataSettings({ onChanged }: { onChanged: () => void }) {
   const db = useSQLiteContext();
   const { styles, t, palette, language } = useApp();
@@ -43,6 +55,7 @@ export function DataSettings({ onChanged }: { onChanged: () => void }) {
   const [showRestore, setShowRestore] = useState(false);
   const [source, setSource] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [csvNotes, setCsvNotes] = useState(false);
 
   function report(nextMessage: string, nextError = '') {
     setMessage(nextMessage);
@@ -61,6 +74,23 @@ export function DataSettings({ onChanged }: { onChanged: () => void }) {
       else report(formatTemplate(t.exportDone, { subjects: document.subjects.length, lessons: document.lessons.length }));
     } catch (caught) {
       report('', caught instanceof BackupTooLargeError ? formatTemplate(t.exportTooLarge, { max: MAX_BACKUP_LESSONS }) : t.exportError);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function exportCsv() {
+    setBusy('csv');
+    report('');
+    try {
+      const today = toLocalDate(new Date());
+      const rows = await readHistoryForCsv(db, today, { includePrivateNotes: csvNotes });
+      const csv = buildHistoryCsv(rows, csvLabels(t), { includePrivateNotes: csvNotes });
+      const outcome = await shareCsvFile(csv, historyCsvFileName(today), t.csvDialogTitle);
+      if (outcome === 'unavailable') report('', t.exportUnavailable);
+      else report(formatTemplate(t.csvDone, { lessons: rows.length }));
+    } catch (caught) {
+      report('', caught instanceof HistoryExportTooLargeError ? formatTemplate(t.csvTooLarge, { max: MAX_CSV_LESSONS }) : t.csvError);
     } finally {
       setBusy(null);
     }
@@ -151,6 +181,21 @@ export function DataSettings({ onChanged }: { onChanged: () => void }) {
         style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed, disabled && styles.disabled]}>
         <Text style={styles.secondaryButtonText}>{busy === 'export' ? t.exporting : t.exportBackup}</Text>
       </Pressable>
+
+      <View style={[styles.listRow, { marginTop: 12 }]}>
+        <Text style={styles.rowTitle}>{t.csvExport}</Text>
+        <Text style={styles.rowMeta}>{t.csvCaption}</Text>
+        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: csvNotes, disabled }} accessibilityHint={t.csvIncludeNotesHint}
+          disabled={disabled} hitSlop={4} onPress={() => setCsvNotes((value) => !value)}
+          style={({ pressed }) => [styles.option, csvNotes && styles.optionSelected, pressed && styles.pressed]}>
+          <Text style={[styles.optionText, csvNotes && styles.optionTextSelected]}>{`${csvNotes ? '☑' : '☐'} ${t.csvIncludeNotes}`}</Text>
+        </Pressable>
+        <Text style={[styles.rowMeta, { marginTop: 6 }]}>{t.csvIncludeNotesHint}</Text>
+        <Pressable accessibilityRole="button" accessibilityState={{ disabled, busy: busy === 'csv' }} disabled={disabled} onPress={() => void exportCsv()}
+          style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed, disabled && styles.disabled]}>
+          <Text style={styles.secondaryButtonText}>{busy === 'csv' ? t.exporting : t.csvExport}</Text>
+        </Pressable>
+      </View>
 
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: showRestore, disabled }} disabled={disabled}
         onPress={() => { setShowRestore((value) => !value); setPreview(null); report(''); }}
