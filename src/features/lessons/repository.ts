@@ -37,13 +37,14 @@ const LESSON_COLUMNS = `l.id, l.subject_id, s.name AS subject, l.teacher_name, l
 
 /**
  * Occurrences a series-wide change may touch: still planned, nothing recorded
- * (attendance, studied content, notes, next step, objective tags), never edited on their
+ * (attendance, studied content, notes, next step, objective tags, attachments), never edited on their
  * own, and not started yet at ($today, $minute). Static SQL fragment over the unaliased
  * `lessons` table; values are bound by name.
  */
 const UNTOUCHED_FUTURE = `status = 'planned' AND attendance = 'unmarked' AND studied_content IS NULL
   AND private_notes IS NULL AND next_step IS NULL AND series_exception = 0
   AND NOT EXISTS (SELECT 1 FROM lesson_objectives lo WHERE lo.lesson_id = lessons.id)
+  AND NOT EXISTS (SELECT 1 FROM lesson_attachments la WHERE la.lesson_id = lessons.id)
   AND (local_date > $today OR (local_date = $today AND start_minute > $minute))`;
 
 function toLesson(row: LessonRow): Lesson {
