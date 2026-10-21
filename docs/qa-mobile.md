@@ -136,3 +136,15 @@ O workspace desta sessão não tem Android SDK/emulador disponível. O bundle JS
 No arranque do projeto, `npm audit` apontou advisories transitivos na árvore do Expo CLI/Metro e React Native (`braces`, `node-forge`, `uuid`). A correção automática não encontra atualização segura e `npm audit fix --force` sugere rebaixar o Expo para 44.0.6; isso quebraria o SDK atual e foi recusado. Reavaliar quando o Expo atualizar essas dependências.
 
 O estado observado em 18/10/2026 foi 22 advisories na árvore completa (15 high, 7 moderate). O audit aponta dependências transitivas e não prova que todas entram no binário final; não ocultar os avisos nem afirmar que o binário foi auditado. A instalação local/bundle não substitui uma revisão de segurança antes da distribuição. A distribuição deve aguardar atualização do framework ou uma análise de impacto que trate esses advisories individualmente.
+
+## Teste em aparelho real — 21/10/2026
+
+Moto G06 (Android 15), APK de teste gerado localmente (`assembleRelease` só para arm64-v8a, assinado com a chave de debug, não é versão de loja) e instalado por `adb install`.
+
+- Funcionou: abrir o app offline, criar aula, marcar presença, registrar conteúdo estudado, anexar PDF pelo seletor do sistema, abrir/compartilhar pelo menu do Android, remover anexo com confirmação, histórico, cor da matéria, calendário do mês, série semanal (24 aulas) e reabrir o app após forçar a paragem com os dados preservados. Nenhum crash no logcat.
+- Encontrado e corrigido: cabeçalho e títulos dos modais por baixo da barra de status (Android 15 desenha edge-to-edge) e data com "De" maiúsculo. A primeira correção usava `react-native-safe-area-context`, que não compila em Windows por exceder 260 caracteres de caminho; foi trocada pela altura de `StatusBar` no Android.
+- Pendente: confirmar a correção no aparelho (APK corrigido em `E:\tools\aula-em-dia-teste.apk`), barra de abas ainda encosta ligeiramente na barra de gestos, TalkBack não testado, iPhone não testado.
+
+### Gerar o APK de teste no Windows
+
+JDK 17 portátil em `E:\tools\jdk-17`; copiar o projeto para um caminho curto (ex.: `E:\am`), `npm ci`, `npx expo prebuild --platform android --no-install`, depois em `android\`: `gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a` com `JAVA_HOME` e `ANDROID_HOME` definidos.
