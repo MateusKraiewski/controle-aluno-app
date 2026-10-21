@@ -3,7 +3,11 @@ import { normalizeForSearch } from '../../lib/text';
 import { MAX_SORT_ORDER, isSubjectColor } from './colors';
 import type { SubjectColor } from './colors';
 
-export type Subject = { id: number; name: string; archived: boolean; lessonCount: number; color: SubjectColor | null; sortOrder: number | null };
+export type Subject = {
+  id: number; name: string; archived: boolean; lessonCount: number; color: SubjectColor | null; sortOrder: number | null;
+  /** Learning objectives not yet marked done. */
+  activeObjectives: number;
+};
 
 const MAX_SUBJECTS = 200;
 /** Upper bound when renumbering the manual order (matches the backup limit). */
@@ -15,18 +19,19 @@ const MAX_ORDERED = 2_000;
  */
 const SUBJECT_ORDER = 's.archived_at IS NOT NULL, s.sort_order IS NULL, s.sort_order, s.name COLLATE NOCASE, s.id';
 
-/** Subjects in display order, with lesson counts; bounded to 200 rows. */
+/** Subjects in display order, with lesson and active-objective counts; bounded to 200 rows. */
 export async function listSubjects(db: SQLiteDatabase, options: { includeArchived: boolean }): Promise<Subject[]> {
-  const rows = await db.getAllAsync<{ id: number; name: string; archived_at: number | null; lesson_count: number; color: string | null; sort_order: number | null }>(`
+  const rows = await db.getAllAsync<{ id: number; name: string; archived_at: number | null; lesson_count: number; color: string | null; sort_order: number | null; active_objectives: number }>(`
     SELECT s.id, s.name, s.archived_at, s.color, s.sort_order,
-      (SELECT COUNT(*) FROM lessons l WHERE l.subject_id = s.id) AS lesson_count
+      (SELECT COUNT(*) FROM lessons l WHERE l.subject_id = s.id) AS lesson_count,
+      (SELECT COUNT(*) FROM learning_objectives o WHERE o.subject_id = s.id AND o.status <> 'done') AS active_objectives
     FROM subjects s
     WHERE (? = 1 OR s.archived_at IS NULL)
     ORDER BY ${SUBJECT_ORDER}
     LIMIT ?`, options.includeArchived ? 1 : 0, MAX_SUBJECTS);
   return rows.map((row) => ({
     id: row.id, name: row.name, archived: row.archived_at !== null, lessonCount: row.lesson_count,
-    color: isSubjectColor(row.color) ? row.color : null, sortOrder: row.sort_order,
+    color: isSubjectColor(row.color) ? row.color : null, sortOrder: row.sort_order, activeObjectives: row.active_objectives,
   }));
 }
 

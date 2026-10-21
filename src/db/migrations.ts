@@ -1,9 +1,9 @@
 // Schema migrations, kept free of expo imports so they can be exercised against
 // Node's built-in SQLite in tests. Every step is additive: no DROP; v3 and v4 only fill
-// the columns they add.
+// the columns they add; v5 only creates new tables.
 import { lessonSearchText, normalizeForSearch } from '../lib/text';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** Rows per backfill page, so a long history is never read into memory at once. */
 const BACKFILL_PAGE = 500;
@@ -82,6 +82,30 @@ const V4 = `
   ALTER TABLE lessons ADD COLUMN series_exception INTEGER NOT NULL DEFAULT 0 CHECK(series_exception IN (0, 1));
 `;
 
+// v5: learning objectives per subject and the lessons where each was worked on.
+// New tables only; no existing row or column is touched. The dismissed_review_* pair
+// remembers which review suggestion (identified by its basis date) the student hid.
+const V5 = `
+  CREATE TABLE learning_objectives (
+    id INTEGER PRIMARY KEY,
+    subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE RESTRICT,
+    title TEXT NOT NULL CHECK(length(title) BETWEEN 1 AND 200),
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','practising','done')),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    dismissed_review_basis TEXT CHECK(dismissed_review_basis IS NULL OR length(dismissed_review_basis) = 10),
+    dismissed_review_at INTEGER
+  );
+  CREATE INDEX learning_objectives_subject_idx ON learning_objectives(subject_id, status, id);
+  CREATE TABLE lesson_objectives (
+    lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    objective_id INTEGER NOT NULL REFERENCES learning_objectives(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (lesson_id, objective_id)
+  ) WITHOUT ROWID;
+  CREATE INDEX lesson_objectives_objective_idx ON lesson_objectives(objective_id, lesson_id);
+`;
+
 /**
  * Derives the v4 series state for data written before v4 (migration and restore of a
  * v3 backup). The series template takes teacher/planned content from the earliest
@@ -149,6 +173,7 @@ export async function migrate(db: MigrationDatabase): Promise<number> {
       await db.execAsync(V4);
       await deriveSeriesState(db);
     }
+    if (current < 5) await db.execAsync(V5);
     await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   });
   return SCHEMA_VERSION;

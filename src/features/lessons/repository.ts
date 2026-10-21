@@ -37,11 +37,13 @@ const LESSON_COLUMNS = `l.id, l.subject_id, s.name AS subject, l.teacher_name, l
 
 /**
  * Occurrences a series-wide change may touch: still planned, nothing recorded
- * (attendance, studied content, notes, next step), never edited on their own, and not
- * started yet at ($today, $minute). Static SQL fragment; values are bound by name.
+ * (attendance, studied content, notes, next step, objective tags), never edited on their
+ * own, and not started yet at ($today, $minute). Static SQL fragment over the unaliased
+ * `lessons` table; values are bound by name.
  */
 const UNTOUCHED_FUTURE = `status = 'planned' AND attendance = 'unmarked' AND studied_content IS NULL
   AND private_notes IS NULL AND next_step IS NULL AND series_exception = 0
+  AND NOT EXISTS (SELECT 1 FROM lesson_objectives lo WHERE lo.lesson_id = lessons.id)
   AND (local_date > $today OR (local_date = $today AND start_minute > $minute))`;
 
 function toLesson(row: LessonRow): Lesson {
@@ -188,6 +190,11 @@ export async function updateLesson(db: SQLiteDatabase, id: number, input: Lesson
       $planned: input.plannedContent, $studied: input.studiedContent, $notes: input.privateNotes, $next: input.nextStep,
       $search: lessonSearchText(input), $now: now, $id: id,
     });
+    // Objective tags belong to the lesson's subject; moving the lesson to another
+    // subject drops tags of the old subject's objectives (the objectives stay).
+    await db.runAsync(
+      'DELETE FROM lesson_objectives WHERE lesson_id = ? AND objective_id IN (SELECT id FROM learning_objectives WHERE subject_id <> ?)',
+      id, subjectId);
   });
   return { seriesUpdated };
 }
