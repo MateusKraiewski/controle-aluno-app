@@ -22,6 +22,7 @@ import { shortDate } from '../lib/format';
 import type { TranslationKey } from '../lib/locales';
 import { weekdayLabel } from '../lib/locales';
 import { useApp } from '../theme/AppContext';
+import { LessonObjectives } from './LessonObjectives';
 
 export type EditorTarget = { mode: 'create'; localDate: string } | { mode: 'edit'; id: number };
 
@@ -342,6 +343,7 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
                   <Field label={t.studied} value={studiedContent} onChangeText={setStudiedContent} placeholder={t.studiedPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
                   <Field label={t.nextStep} value={nextStep} onChangeText={setNextStep} placeholder={t.nextStepPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
                   <Field label={t.privateNotes} value={privateNotes} onChangeText={setPrivateNotes} placeholder={t.privateNotesPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
+                  {lesson && <LessonObjectives lessonId={lesson.id} subjectId={lesson.subjectId} onChanged={onChanged} />}
                 </>
               )}
 

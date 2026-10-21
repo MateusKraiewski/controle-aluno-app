@@ -10,6 +10,9 @@ import { listSubjects, moveSubject, renameSubject, setSubjectArchived, setSubjec
 import type { Subject } from '../features/subjects/repository';
 import { colorName } from '../lib/locales';
 import { useApp } from '../theme/AppContext';
+import { ObjectivesModal } from './ObjectivesModal';
+import type { ObjectivesTarget } from './ObjectivesModal';
+import { ReviewSuggestions } from './ReviewSuggestions';
 
 /** A colour option: swatch plus the colour's name, so colour is never the only cue. */
 function ColorOption({ color, selected, onPress }: { color: SubjectColor | null; selected: boolean; onPress: () => void }) {
@@ -36,6 +39,7 @@ export function SubjectsScreen({ revision, onChanged }: SubjectsScreenProps) {
   const [name, setName] = useState('');
   const [colorId, setColorId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [objectivesTarget, setObjectivesTarget] = useState<ObjectivesTarget | null>(null);
   const subjectsError = t.subjectsError;
 
   useEffect(() => {
@@ -106,6 +110,7 @@ export function SubjectsScreen({ revision, onChanged }: SubjectsScreenProps) {
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={{ paddingTop: 10, paddingBottom: 30 }}
           keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={<ReviewSuggestions revision={revision} onOpen={(subjectId, subject) => setObjectivesTarget({ subjectId, subject })} />}
           ListEmptyComponent={<Text style={styles.emptyText}>{t.subjectsEmpty}</Text>}
           renderItem={({ item, index }) => (
             <View style={styles.listRow}>
@@ -146,6 +151,8 @@ export function SubjectsScreen({ revision, onChanged }: SubjectsScreenProps) {
                   </>
                 ) : (
                   <>
+                    <Chip label={formatTemplate(t.objectivesOpen, { count: item.activeObjectives })} accessibilityLabel={`${formatTemplate(t.objectivesOpen, { count: item.activeObjectives })}: ${item.name}`}
+                      onPress={() => setObjectivesTarget({ subjectId: item.id, subject: item.name })} />
                     <Chip label={t.rename} accessibilityLabel={`${t.rename}: ${item.name}`} onPress={() => { setEditingId(item.id); setName(item.name); }} />
                     <Chip label={item.archived ? t.unarchive : t.archive} accessibilityLabel={`${item.archived ? t.unarchive : t.archive}: ${item.name}`} onPress={() => void toggleArchived(item)} />
                     <Chip label={t.colorPick} selected={colorId === item.id} accessibilityLabel={`${t.colorPick}: ${item.name}`} onPress={() => setColorId((current) => (current === item.id ? null : item.id))} />
@@ -158,6 +165,7 @@ export function SubjectsScreen({ revision, onChanged }: SubjectsScreenProps) {
           )}
         />
       )}
+      <ObjectivesModal target={objectivesTarget} onClose={() => setObjectivesTarget(null)} onChanged={onChanged} />
     </View>
   );
 }

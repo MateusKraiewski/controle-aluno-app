@@ -20,6 +20,20 @@ const ptBR = {
   colorPick: 'Cor', colorLabel: 'Cor: {name}', colorNone: 'Sem cor', moveUp: 'Mover para cima', moveDown: 'Mover para baixo', colorGreen: 'Verde', colorBlue: 'Azul', colorPurple: 'Roxo', colorRed: 'Vermelho', colorOrange: 'Laranja', colorTeal: 'Turquesa', colorPink: 'Rosa', colorGray: 'Cinza',
   privateNotes: 'Apontamentos privados', privateNotesPlaceholder: 'Só para você; não aparecem no cartão da agenda', nextStep: 'Próximo passo / tarefa', nextStepPlaceholder: 'Ex.: Rever capítulo 3 antes da próxima aula', nextStepPrefix: 'Próximo passo:',
   monthOpen: 'Mês', monthEyebrow: 'CALENDÁRIO', previousMonth: 'Mês anterior', nextMonth: 'Próximo mês', monthDayCount: '{count} aula(s) planejada(s)', monthDayCancelled: '{count} cancelada(s)', monthOpenWeek: 'Abre a semana na agenda', monthLegend: 'O número verde é a quantidade de aulas planejadas no dia; “−N” indica aulas canceladas (não são faltas). Toque num dia para abrir a semana.',
+  objectivesOpen: 'Objetivos ({count})', objectivesEyebrow: 'OBJETIVOS DE APRENDIZAGEM', objectivesCaption: 'Metas que você define para esta matéria. O estado é escolhido por você; o app não avalia notas nem desempenho.', objectiveNew: 'Novo objetivo',
+  objectivePlaceholder: 'Ex.: Resolver equações do 2.º grau', objectiveAdd: 'Adicionar objetivo', objectiveTitleRequired: 'Escreva o objetivo.', objectiveTitleTooLong: 'O objetivo deve ter até 200 caracteres.',
+  objectiveTooMany: 'Limite de 200 objetivos nesta matéria.', objectiveError: 'Não foi possível salvar o objetivo.', objectivesLoadError: 'Não foi possível carregar os objetivos.', objectivesEmpty: 'Nenhum objetivo ainda. Adicione o primeiro acima.',
+  objectiveStatus: 'Estado', objectiveStatusOpen: 'Aberto', objectiveStatusPractising: 'Praticando', objectiveStatusDone: 'Concluído',
+  objectiveLastWorked: 'Trabalhado pela última vez em {date}', objectiveNeverWorked: 'Ainda não marcado em nenhuma aula passada', objectiveLessons: '{count} aula(s) marcada(s)', objectiveEdit: 'Editar',
+  objectiveSave: 'Salvar', showDone: 'Mostrar concluídos', lessonObjectives: 'Objetivos trabalhados nesta aula', lessonObjectivesHint: 'Marque o que trabalhou; fica salvo na hora.',
+  lessonObjectivesEmpty: 'Esta matéria ainda não tem objetivos. Crie-os em Matérias → Objetivos.', lessonObjectivesError: 'Não foi possível atualizar os objetivos desta aula.', reviewTitle: 'Sugestões de revisão', reviewCaption: 'Calculadas neste aparelho só a partir das datas das aulas em que você marcou cada objetivo. Não avaliam notas nem desempenho.',
+  reviewNotReviewed: 'Há {weeks} semanas sem rever “{title}”', reviewNeverWorked: '“{title}” ainda não foi trabalhado em nenhuma aula (há {weeks} semanas)', reviewSourceLesson: '{subject} · última aula com este objetivo: {date}', reviewSourceCreated: '{subject} · objetivo criado em {date}',
+  reviewDismiss: 'Dispensar', reviewOpen: 'Ver objetivos', reviewError: 'Não foi possível atualizar as sugestões.', csvExport: 'Exportar histórico (CSV)',
+  csvCaption: 'Aulas até hoje para abrir numa planilha: data, horário, matéria, estado, presença registrada por você, planejado, estudado e próximo passo.', csvIncludeNotes: 'Incluir apontamentos privados', csvIncludeNotesHint: 'Desligado por padrão: quem receber o arquivo consegue lê-los.', csvDialogTitle: 'Salvar ou enviar o histórico',
+  csvDone: 'Histórico exportado: {lessons} aula(s).', csvError: 'Não foi possível exportar o histórico.', csvTooLarge: 'O histórico passa de {max} aulas; a exportação CSV não está disponível.', csvColDate: 'Data',
+  csvColStart: 'Início', csvColEnd: 'Fim', csvColSubject: 'Matéria', csvColStatus: 'Estado',
+  csvColAttendance: 'Presença (registro do aluno)', csvColPlanned: 'Planejado', csvColStudied: 'Estudado', csvColNextStep: 'Próximo passo',
+  csvColNotes: 'Apontamentos privados', csvStatusPlanned: 'Planejada',
 };
 
 export type TranslationKey = keyof typeof ptBR;
@@ -42,6 +56,20 @@ const ptPT: Translations = {
   colorPick: 'Cor', colorLabel: 'Cor: {name}', colorNone: 'Sem cor', moveUp: 'Mover para cima', moveDown: 'Mover para baixo', colorGreen: 'Verde', colorBlue: 'Azul', colorPurple: 'Roxo', colorRed: 'Vermelho', colorOrange: 'Laranja', colorTeal: 'Turquesa', colorPink: 'Rosa', colorGray: 'Cinzento',
   privateNotes: 'Apontamentos privados', privateNotesPlaceholder: 'Só para si; não aparecem no cartão da agenda', nextStep: 'Próximo passo / tarefa', nextStepPlaceholder: 'Ex.: Rever o capítulo 3 antes da próxima aula', nextStepPrefix: 'Próximo passo:',
   monthOpen: 'Mês', monthEyebrow: 'CALENDÁRIO', previousMonth: 'Mês anterior', nextMonth: 'Mês seguinte', monthDayCount: '{count} aula(s) planeada(s)', monthDayCancelled: '{count} cancelada(s)', monthOpenWeek: 'Abre a semana na agenda', monthLegend: 'O número verde é a quantidade de aulas planeadas no dia; “−N” indica aulas canceladas (não são faltas). Toque num dia para abrir a semana.',
+  objectivesOpen: 'Objetivos ({count})', objectivesEyebrow: 'OBJETIVOS DE APRENDIZAGEM', objectivesCaption: 'Metas que define para esta disciplina. O estado é escolhido por si; a app não avalia notas nem desempenho.', objectiveNew: 'Novo objetivo',
+  objectivePlaceholder: 'Ex.: Resolver equações do 2.º grau', objectiveAdd: 'Adicionar objetivo', objectiveTitleRequired: 'Escreva o objetivo.', objectiveTitleTooLong: 'O objetivo deve ter até 200 caracteres.',
+  objectiveTooMany: 'Limite de 200 objetivos nesta disciplina.', objectiveError: 'Não foi possível guardar o objetivo.', objectivesLoadError: 'Não foi possível carregar os objetivos.', objectivesEmpty: 'Ainda não há objetivos. Adicione o primeiro acima.',
+  objectiveStatus: 'Estado', objectiveStatusOpen: 'Aberto', objectiveStatusPractising: 'A praticar', objectiveStatusDone: 'Concluído',
+  objectiveLastWorked: 'Trabalhado pela última vez a {date}', objectiveNeverWorked: 'Ainda não marcado em nenhuma aula passada', objectiveLessons: '{count} aula(s) marcada(s)', objectiveEdit: 'Editar',
+  objectiveSave: 'Guardar', showDone: 'Mostrar concluídos', lessonObjectives: 'Objetivos trabalhados nesta aula', lessonObjectivesHint: 'Marque o que trabalhou; fica guardado de imediato.',
+  lessonObjectivesEmpty: 'Esta disciplina ainda não tem objetivos. Crie-os em Disciplinas → Objetivos.', lessonObjectivesError: 'Não foi possível atualizar os objetivos desta aula.', reviewTitle: 'Sugestões de revisão', reviewCaption: 'Calculadas neste aparelho só a partir das datas das aulas em que marcou cada objetivo. Não avaliam notas nem desempenho.',
+  reviewNotReviewed: 'Há {weeks} semanas sem rever “{title}”', reviewNeverWorked: '“{title}” ainda não foi trabalhado em nenhuma aula (há {weeks} semanas)', reviewSourceLesson: '{subject} · última aula com este objetivo: {date}', reviewSourceCreated: '{subject} · objetivo criado a {date}',
+  reviewDismiss: 'Dispensar', reviewOpen: 'Ver objetivos', reviewError: 'Não foi possível atualizar as sugestões.', csvExport: 'Exportar histórico (CSV)',
+  csvCaption: 'Aulas até hoje para abrir numa folha de cálculo: data, horário, disciplina, estado, presença registada por si, planeado, estudado e próximo passo.', csvIncludeNotes: 'Incluir apontamentos privados', csvIncludeNotesHint: 'Desligado por omissão: quem receber o ficheiro consegue lê-los.', csvDialogTitle: 'Guardar ou enviar o histórico',
+  csvDone: 'Histórico exportado: {lessons} aula(s).', csvError: 'Não foi possível exportar o histórico.', csvTooLarge: 'O histórico passa de {max} aulas; a exportação CSV não está disponível.', csvColDate: 'Data',
+  csvColStart: 'Início', csvColEnd: 'Fim', csvColSubject: 'Disciplina', csvColStatus: 'Estado',
+  csvColAttendance: 'Presença (registo do aluno)', csvColPlanned: 'Planeado', csvColStudied: 'Estudado', csvColNextStep: 'Próximo passo',
+  csvColNotes: 'Apontamentos privados', csvStatusPlanned: 'Planeada',
 };
 
 const en: Translations = {
@@ -61,6 +89,20 @@ const en: Translations = {
   colorPick: 'Colour', colorLabel: 'Colour: {name}', colorNone: 'No colour', moveUp: 'Move up', moveDown: 'Move down', colorGreen: 'Green', colorBlue: 'Blue', colorPurple: 'Purple', colorRed: 'Red', colorOrange: 'Orange', colorTeal: 'Teal', colorPink: 'Pink', colorGray: 'Grey',
   privateNotes: 'Private notes', privateNotesPlaceholder: 'Only for you; not shown on the agenda card', nextStep: 'Next step / task', nextStepPlaceholder: 'E.g. Review chapter 3 before the next class', nextStepPrefix: 'Next step:',
   monthOpen: 'Month', monthEyebrow: 'CALENDAR', previousMonth: 'Previous month', nextMonth: 'Next month', monthDayCount: '{count} planned class(es)', monthDayCancelled: '{count} cancelled', monthOpenWeek: 'Opens the week in the agenda', monthLegend: 'The green number is how many classes are planned that day; “−N” shows cancelled classes (not absences). Tap a day to open its week.',
+  objectivesOpen: 'Objectives ({count})', objectivesEyebrow: 'LEARNING OBJECTIVES', objectivesCaption: 'Goals you set for this subject. You choose the status; the app never assesses grades or performance.', objectiveNew: 'New objective',
+  objectivePlaceholder: 'E.g. Solve quadratic equations', objectiveAdd: 'Add objective', objectiveTitleRequired: 'Write the objective.', objectiveTitleTooLong: 'Objectives can have up to 200 characters.',
+  objectiveTooMany: 'This subject already has the maximum of 200 objectives.', objectiveError: 'Could not save the objective.', objectivesLoadError: 'Could not load the objectives.', objectivesEmpty: 'No objectives yet. Add the first one above.',
+  objectiveStatus: 'Status', objectiveStatusOpen: 'Open', objectiveStatusPractising: 'Practising', objectiveStatusDone: 'Done',
+  objectiveLastWorked: 'Last worked on {date}', objectiveNeverWorked: 'Not tagged in any past class yet', objectiveLessons: '{count} tagged class(es)', objectiveEdit: 'Edit',
+  objectiveSave: 'Save', showDone: 'Show done', lessonObjectives: 'Objectives worked on in this class', lessonObjectivesHint: 'Tick what you worked on; it is saved right away.',
+  lessonObjectivesEmpty: 'This subject has no objectives yet. Create them in Subjects → Objectives.', lessonObjectivesError: 'Could not update the objectives of this class.', reviewTitle: 'Review suggestions', reviewCaption: 'Worked out on this device only from the dates of the classes where you tagged each objective. They never assess grades or performance.',
+  reviewNotReviewed: '{weeks} weeks without reviewing “{title}”', reviewNeverWorked: '“{title}” has not been worked on in any class yet ({weeks} weeks)', reviewSourceLesson: '{subject} · last class with this objective: {date}', reviewSourceCreated: '{subject} · objective created on {date}',
+  reviewDismiss: 'Dismiss', reviewOpen: 'See objectives', reviewError: 'Could not update the suggestions.', csvExport: 'Export history (CSV)',
+  csvCaption: 'Classes up to today to open in a spreadsheet: date, time, subject, status, attendance you recorded, planned, studied and next step.', csvIncludeNotes: 'Include private notes', csvIncludeNotesHint: 'Off by default: anyone who receives the file can read them.', csvDialogTitle: 'Save or send the history',
+  csvDone: 'History exported: {lessons} class(es).', csvError: 'Could not export the history.', csvTooLarge: 'The history has more than {max} classes; CSV export is not available.', csvColDate: 'Date',
+  csvColStart: 'Start', csvColEnd: 'End', csvColSubject: 'Subject', csvColStatus: 'Status',
+  csvColAttendance: 'Attendance (student record)', csvColPlanned: 'Planned', csvColStudied: 'Studied', csvColNextStep: 'Next step',
+  csvColNotes: 'Private notes', csvStatusPlanned: 'Planned',
 };
 
 const es: Translations = {
@@ -80,6 +122,20 @@ const es: Translations = {
   colorPick: 'Color', colorLabel: 'Color: {name}', colorNone: 'Sin color', moveUp: 'Subir', moveDown: 'Bajar', colorGreen: 'Verde', colorBlue: 'Azul', colorPurple: 'Morado', colorRed: 'Rojo', colorOrange: 'Naranja', colorTeal: 'Turquesa', colorPink: 'Rosa', colorGray: 'Gris',
   privateNotes: 'Notas privadas', privateNotesPlaceholder: 'Solo para ti; no aparecen en la tarjeta de la agenda', nextStep: 'Próximo paso / tarea', nextStepPlaceholder: 'Ej.: Repasar el capítulo 3 antes de la próxima clase', nextStepPrefix: 'Próximo paso:',
   monthOpen: 'Mes', monthEyebrow: 'CALENDARIO', previousMonth: 'Mes anterior', nextMonth: 'Mes siguiente', monthDayCount: '{count} clase(s) planificada(s)', monthDayCancelled: '{count} cancelada(s)', monthOpenWeek: 'Abre la semana en la agenda', monthLegend: 'El número verde es la cantidad de clases planificadas ese día; “−N” indica clases canceladas (no son faltas). Toca un día para abrir su semana.',
+  objectivesOpen: 'Objetivos ({count})', objectivesEyebrow: 'OBJETIVOS DE APRENDIZAJE', objectivesCaption: 'Metas que defines para esta asignatura. Tú eliges el estado; la app no evalúa notas ni rendimiento.', objectiveNew: 'Nuevo objetivo',
+  objectivePlaceholder: 'Ej.: Resolver ecuaciones de segundo grado', objectiveAdd: 'Añadir objetivo', objectiveTitleRequired: 'Escribe el objetivo.', objectiveTitleTooLong: 'El objetivo puede tener hasta 200 caracteres.',
+  objectiveTooMany: 'Límite de 200 objetivos en esta asignatura.', objectiveError: 'No se pudo guardar el objetivo.', objectivesLoadError: 'No se pudieron cargar los objetivos.', objectivesEmpty: 'Aún no hay objetivos. Añade el primero arriba.',
+  objectiveStatus: 'Estado', objectiveStatusOpen: 'Abierto', objectiveStatusPractising: 'Practicando', objectiveStatusDone: 'Completado',
+  objectiveLastWorked: 'Trabajado por última vez el {date}', objectiveNeverWorked: 'Aún no marcado en ninguna clase pasada', objectiveLessons: '{count} clase(s) marcada(s)', objectiveEdit: 'Editar',
+  objectiveSave: 'Guardar', showDone: 'Mostrar completados', lessonObjectives: 'Objetivos trabajados en esta clase', lessonObjectivesHint: 'Marca lo que trabajaste; se guarda al momento.',
+  lessonObjectivesEmpty: 'Esta asignatura aún no tiene objetivos. Créalos en Asignaturas → Objetivos.', lessonObjectivesError: 'No se pudieron actualizar los objetivos de esta clase.', reviewTitle: 'Sugerencias de repaso', reviewCaption: 'Calculadas en este dispositivo solo a partir de las fechas de las clases en las que marcaste cada objetivo. No evalúan notas ni rendimiento.',
+  reviewNotReviewed: '{weeks} semanas sin repasar «{title}»', reviewNeverWorked: '«{title}» aún no se ha trabajado en ninguna clase (hace {weeks} semanas)', reviewSourceLesson: '{subject} · última clase con este objetivo: {date}', reviewSourceCreated: '{subject} · objetivo creado el {date}',
+  reviewDismiss: 'Descartar', reviewOpen: 'Ver objetivos', reviewError: 'No se pudieron actualizar las sugerencias.', csvExport: 'Exportar historial (CSV)',
+  csvCaption: 'Clases hasta hoy para abrir en una hoja de cálculo: fecha, horario, asignatura, estado, asistencia que registraste, planificado, estudiado y próximo paso.', csvIncludeNotes: 'Incluir notas privadas', csvIncludeNotesHint: 'Desactivado por defecto: quien reciba el archivo puede leerlas.', csvDialogTitle: 'Guardar o enviar el historial',
+  csvDone: 'Historial exportado: {lessons} clase(s).', csvError: 'No se pudo exportar el historial.', csvTooLarge: 'El historial supera las {max} clases; la exportación CSV no está disponible.', csvColDate: 'Fecha',
+  csvColStart: 'Inicio', csvColEnd: 'Fin', csvColSubject: 'Asignatura', csvColStatus: 'Estado',
+  csvColAttendance: 'Asistencia (registro del alumno)', csvColPlanned: 'Planificado', csvColStudied: 'Estudiado', csvColNextStep: 'Próximo paso',
+  csvColNotes: 'Notas privadas', csvStatusPlanned: 'Planificada',
 };
 
 const translations: Record<Language, Translations> = { 'pt-BR': ptBR, 'pt-PT': ptPT, en, es };
