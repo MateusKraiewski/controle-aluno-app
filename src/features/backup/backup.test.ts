@@ -6,6 +6,7 @@ import { SCHEMA_VERSION, migrate } from '../../db/migrations';
 import { openTestDatabase } from '../../testing/nodeSqlite';
 import { generateOccurrences } from '../lessons/domain';
 import { cancelLessons, createLesson, createLessonSeries, listHistoryPage, updateAttendance, updateLesson } from '../lessons/repository';
+import { createObjective, dismissReviewSuggestion, setLessonObjectiveTag, setObjectiveStatus } from '../objectives/repository';
 import { listSubjects, moveSubject, setSubjectArchived, setSubjectColor } from '../subjects/repository';
 import { BACKUP_FORMAT, MAX_BACKUP_CHARS, backupFileName, serializeBackup, summarizeBackup, validateBackup } from './format';
 import type { BackupDocument, BackupErrorCode } from './format';
@@ -24,7 +25,7 @@ beforeEach(async () => {
   ({ db, raw } = await openMigrated());
 });
 
-/** Every stored column of the three tables, including derived search keys. */
+/** Every stored column of every table, including derived search keys. */
 function snapshot(database: DatabaseSync): string {
   const dump = (sql: string) => database.prepare(sql).all().map((row) => ({ ...row }));
   return JSON.stringify({
@@ -32,6 +33,8 @@ function snapshot(database: DatabaseSync): string {
     series: dump('SELECT id, subject_id, frequency, weekdays_mask, start_date, end_date, start_minute, duration_minutes, created_at, teacher_name, planned_content FROM lesson_series ORDER BY id'),
     lessons: dump(`SELECT id, subject_id, teacher_name, local_date, start_minute, duration_minutes, planned_content, studied_content, attendance,
       status, cancel_reason, series_id, original_local_date, created_at, updated_at, private_notes, next_step, series_exception, search_text FROM lessons ORDER BY id`),
+    objectives: dump('SELECT id, subject_id, title, status, created_at, updated_at, dismissed_review_basis, dismissed_review_at FROM learning_objectives ORDER BY id'),
+    links: dump('SELECT lesson_id, objective_id, created_at FROM lesson_objectives ORDER BY lesson_id, objective_id'),
   });
 }
 
@@ -57,6 +60,16 @@ async function seed(target: SQLiteDatabase) {
   const quimica = subjects.find((item) => item.name === 'Química');
   assert.ok(quimica);
   await moveSubject(target, quimica.id, 'up');
+  // v5: objectives of Física, one tagged on lesson a with a dismissed suggestion, one done.
+  const fisica = subjects.find((item) => item.name === 'Física');
+  assert.ok(fisica);
+  const newton = await createObjective(target, fisica.id, "Leis de Newton, \"forças\"; d'água");
+  const optics = await createObjective(target, fisica.id, 'Ótica');
+  assert.ok(newton.ok && optics.ok);
+  assert.equal(await setLessonObjectiveTag(target, a, newton.value, true), true);
+  await setObjectiveStatus(target, newton.value, 'practising');
+  await dismissReviewSuggestion(target, newton.value, '2026-10-01');
+  await setObjectiveStatus(target, optics.value, 'done');
 }
 
 function withoutExportedAt(document: BackupDocument) {
@@ -77,13 +90,15 @@ describe('backup export', () => {
     assert.equal(document.format, BACKUP_FORMAT);
     assert.equal(document.schema_version, SCHEMA_VERSION);
     assert.equal(document.exported_at, '2026-10-20T12:00:00.000Z');
-    assert.deepEqual(Object.keys(document), ['format', 'schema_version', 'exported_at', 'subjects', 'lesson_series', 'lessons']);
+    assert.deepEqual(Object.keys(document), ['format', 'schema_version', 'exported_at', 'subjects', 'lesson_series', 'lessons', 'learning_objectives', 'lesson_objectives']);
+    assert.equal(document.learning_objectives.length, 2);
+    assert.equal(document.lesson_objectives.length, 1);
     assert.equal(document.subjects.length, 4);
     assert.equal(document.lesson_series.length, 1);
     assert.ok(document.lessons.every((row) => !('search_text' in row)));
     assert.ok(document.subjects.every((row) => !('search_name' in row)));
     assert.equal(backupFileName(document.exported_at), 'aula-em-dia-backup-2026-10-20.json');
-    assert.deepEqual(summarizeBackup(document), { exportedAt: document.exported_at, schemaVersion: SCHEMA_VERSION, subjects: 4, series: 1, lessons: document.lessons.length });
+    assert.deepEqual(summarizeBackup(document), { exportedAt: document.exported_at, schemaVersion: SCHEMA_VERSION, subjects: 4, series: 1, lessons: document.lessons.length, objectives: 2 });
   });
 
   it('reads more rows than one page', async () => {
@@ -108,7 +123,7 @@ describe('backup round trip', () => {
     const target = await openMigrated();
     await createLesson(target.db, { ...base, subject: 'Dados antigos', localDate: '2026-01-01' }); // replaced, not merged
     const counts = await restoreBackup(target.db, check.value);
-    assert.deepEqual(counts, { subjects: 4, series: 1, lessons: original.lessons.length });
+    assert.deepEqual(counts, { subjects: 4, series: 1, lessons: original.lessons.length, objectives: 2, objectiveLinks: 1 });
     assert.equal(snapshot(target.raw), snapshot(raw));
     assert.deepEqual(withoutExportedAt(await exportBackup(target.db)), withoutExportedAt(original));
 
@@ -122,9 +137,9 @@ describe('backup round trip', () => {
   });
 
   it('restores an empty backup as an empty device', async () => {
-    const empty = validated({ format: BACKUP_FORMAT, schema_version: SCHEMA_VERSION, exported_at: '2026-10-20T00:00:00.000Z', subjects: [], lesson_series: [], lessons: [] });
+    const empty = validated({ format: BACKUP_FORMAT, schema_version: SCHEMA_VERSION, exported_at: '2026-10-20T00:00:00.000Z', subjects: [], lesson_series: [], lessons: [], learning_objectives: [], lesson_objectives: [] });
     await seed(db);
-    assert.deepEqual(await restoreBackup(db, empty), { subjects: 0, series: 0, lessons: 0 });
+    assert.deepEqual(await restoreBackup(db, empty), { subjects: 0, series: 0, lessons: 0, objectives: 0, objectiveLinks: 0 });
   });
 });
 
@@ -216,10 +231,10 @@ describe('delete all data', () => {
     const result = await deleteAllData(db);
     assert.deepEqual(result.deleted, before);
     assert.equal(result.compacted, true);
-    assert.deepEqual(await countLocalData(db), { subjects: 0, series: 0, lessons: 0 });
+    assert.deepEqual(await countLocalData(db), { subjects: 0, series: 0, lessons: 0, objectives: 0, objectiveLinks: 0 });
     assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
     await createLesson(db, { ...base, subject: 'Nova', localDate: '2026-10-20' });
-    assert.deepEqual(await countLocalData(db), { subjects: 1, series: 0, lessons: 1 });
+    assert.deepEqual(await countLocalData(db), { subjects: 1, series: 0, lessons: 1, objectives: 0, objectiveLinks: 0 });
   });
 
   it('rolls back when the erase fails', async () => {
@@ -232,10 +247,17 @@ describe('delete all data', () => {
 });
 
 describe('backup schema compatibility', () => {
-  /** Turns a current export into a document exactly as the previous app version (v3) wrote it. */
+  /** Turns a current export into a document exactly as the app version with schema v4 wrote it. */
+  function asV4(document: BackupDocument): Record<string, unknown> {
+    const { learning_objectives: _o, lesson_objectives: _l, ...rest } = document;
+    return { ...rest, schema_version: 4 };
+  }
+
+  /** Turns a current export into a document exactly as the app version with schema v3 wrote it. */
   function asV3(document: BackupDocument): Record<string, unknown> {
+    const { learning_objectives: _o, lesson_objectives: _l, ...rest } = document;
     return {
-      ...document,
+      ...rest,
       schema_version: 3,
       subjects: document.subjects.map(({ color: _c, sort_order: _o, ...row }) => row),
       lesson_series: document.lesson_series.map(({ teacher_name: _t, planned_content: _p, ...row }) => row),
@@ -243,11 +265,14 @@ describe('backup schema compatibility', () => {
     };
   }
 
-  it('exports the v4 fields', async () => {
+  it('exports the v4 and v5 fields', async () => {
     await seed(db);
     raw.exec("UPDATE subjects SET color = 'blue', sort_order = 2 WHERE name = 'Física'");
     const document = await exportBackup(db);
-    assert.equal(document.schema_version, 4);
+    assert.equal(document.schema_version, 5);
+    assert.deepEqual(Object.keys(document.learning_objectives[0]), ['id', 'subject_id', 'title', 'status', 'created_at', 'updated_at', 'dismissed_review_basis', 'dismissed_review_at']);
+    assert.deepEqual(document.learning_objectives.map((row) => [row.status, row.dismissed_review_basis]), [['practising', '2026-10-01'], ['done', null]]);
+    assert.deepEqual(Object.keys(document.lesson_objectives[0]), ['lesson_id', 'objective_id', 'created_at']);
     assert.deepEqual(Object.keys(document.subjects[0]), ['id', 'name', 'created_at', 'archived_at', 'color', 'sort_order']);
     assert.ok(document.lesson_series.every((row) => 'teacher_name' in row && 'planned_content' in row));
     assert.ok(document.lessons.every((row) => 'private_notes' in row && 'next_step' in row && 'series_exception' in row));
@@ -268,12 +293,64 @@ describe('backup schema compatibility', () => {
     const target = await openMigrated();
     await restoreBackup(target.db, check.value);
     const restored = await exportBackup(target.db);
-    assert.equal(restored.schema_version, 4);
+    assert.equal(restored.schema_version, SCHEMA_VERSION);
+    assert.deepEqual([restored.learning_objectives, restored.lesson_objectives], [[], []]);
     // Everything the v3 document carried is identical; v4 fields are filled/derived.
     assert.deepEqual(asV3(restored).lessons, asV3(v4).lessons);
     assert.deepEqual(restored.lesson_series.map((row) => [row.teacher_name, row.planned_content]), [[null, null]]);
     assert.deepEqual(restored.lessons.filter((row) => row.series_exception === 1).map((row) => row.id), v4.lessons.filter((row) => row.series_exception === 1).map((row) => row.id));
     assert.ok(restored.subjects.every((row) => row.color === null && row.sort_order === null));
+  });
+
+  it('still restores a v4 backup, without objectives', async () => {
+    await seed(db);
+    const v5 = await exportBackup(db);
+    const check = validateBackup(JSON.stringify(asV4(v5)));
+    if (!check.ok) throw new Error(`${check.error.code} ${check.error.path ?? ''}`);
+    assert.equal(check.value.schema_version, 4);
+    assert.equal(summarizeBackup(check.value).objectives, 0);
+    const target = await openMigrated();
+    const counts = await restoreBackup(target.db, check.value);
+    assert.deepEqual([counts.objectives, counts.objectiveLinks], [0, 0]);
+    const restored = await exportBackup(target.db);
+    assert.deepEqual(asV4(restored), { ...asV4(v5), exported_at: restored.exported_at });
+  });
+
+  it('rejects invalid v5 objectives and tags without touching data', async () => {
+    await seed(db);
+    await createLesson(db, { ...base, subject: 'Química', localDate: '2026-10-04' });
+    const good = JSON.parse(serializeBackup(await exportBackup(db))) as any;
+    const before = snapshot(raw);
+    const quimicaLesson = good.lessons.find((row: any) => row.local_date === '2026-10-04').id;
+    const objective = (change: (row: any) => void) => ({ ...good, learning_objectives: good.learning_objectives.map((row: any, index: number) => { const copy = { ...row }; if (index === 0) change(copy); return copy; }) });
+    const link = (change: (row: any) => void) => ({ ...good, lesson_objectives: good.lesson_objectives.map((row: any) => { const copy = { ...row }; change(copy); return copy; }) });
+    const cases: [string, unknown, BackupErrorCode, string][] = [
+      ['v4 document with objectives', { ...asV4(good), learning_objectives: [] }, 'invalidField', '$.learning_objectives'],
+      ['v5 document without tags', (({ lesson_objectives: _l, ...rest }) => rest)(good), 'invalidField', '$.lesson_objectives'],
+      ['unknown status', objective((row) => { row.status = 'mastered'; }), 'invalidField', 'learning_objectives[0].status'],
+      ['grade-like field', objective((row) => { row.score = 10; }), 'invalidField', 'learning_objectives[0].score'],
+      ['long title', objective((row) => { row.title = 'x'.repeat(201); }), 'invalidField', 'learning_objectives[0].title'],
+      ['title with newline', objective((row) => { row.title = 'a\nb'; }), 'invalidField', 'learning_objectives[0].title'],
+      ['blank title', objective((row) => { row.title = ' '; }), 'invalidField', 'learning_objectives[0].title'],
+      ['half dismissal', objective((row) => { row.dismissed_review_at = null; }), 'invalidField', 'learning_objectives[0].dismissed_review_at'],
+      ['bad dismissal date', objective((row) => { row.dismissed_review_basis = '2026-02-30'; }), 'invalidField', 'learning_objectives[0].dismissed_review_basis'],
+      ['objective of unknown subject', objective((row) => { row.subject_id = 999; }), 'missingReference', 'learning_objectives[0].subject_id'],
+      ['duplicate objective id', { ...good, learning_objectives: [good.learning_objectives[0], good.learning_objectives[0]] }, 'duplicateId', 'learning_objectives[1].id'],
+      ['tag of unknown lesson', link((row) => { row.lesson_id = 999; }), 'missingReference', 'lesson_objectives[0].lesson_id'],
+      ['tag of unknown objective', link((row) => { row.objective_id = 999; }), 'missingReference', 'lesson_objectives[0].objective_id'],
+      ['tag across subjects', link((row) => { row.lesson_id = quimicaLesson; }), 'invalidField', 'lesson_objectives[0].objective_id'],
+      ['duplicate tag', { ...good, lesson_objectives: [good.lesson_objectives[0], good.lesson_objectives[0]] }, 'duplicateId', 'lesson_objectives[1]'],
+      ['too many tags', { ...good, lesson_objectives: Array.from({ length: 60_001 }, () => good.lesson_objectives[0]) }, 'tooManyRecords', 'lesson_objectives'],
+    ];
+    for (const [label, document, code, path] of cases) {
+      const result = validateBackup(JSON.stringify(document));
+      assert.equal(result.ok, false, label);
+      if (!result.ok) {
+        assert.equal(result.error.code, code, label);
+        assert.equal(result.error.path, path, label);
+      }
+    }
+    assert.equal(snapshot(raw), before);
   });
 
   it('rejects mixed or invalid v4 fields', async () => {

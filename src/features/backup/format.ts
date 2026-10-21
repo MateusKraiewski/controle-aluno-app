@@ -2,13 +2,14 @@
 // no Expo, no SQLite. A backup that fails any rule is rejected as a whole.
 import { SCHEMA_VERSION } from '../../db/migrations';
 import { MAX_DURATION, MAX_NAME_LENGTH, MAX_TEXT_LENGTH, MIN_DURATION, isValidLocalDate } from '../lessons/domain';
+import { MAX_OBJECTIVE_TITLE, OBJECTIVE_STATUSES } from '../objectives/domain';
 import { MAX_SORT_ORDER, SUBJECT_COLORS } from '../subjects/colors';
 import type { SubjectColor } from '../subjects/colors';
 
 export const BACKUP_FORMAT = 'aula-em-dia.backup';
 /**
- * Oldest backup schema still accepted. v3 documents (previous app version) are read
- * and their missing v4 fields filled with empty values; exports are always current.
+ * Oldest backup schema still accepted. v3 and v4 documents (previous app versions) are
+ * read and their missing fields filled with empty values; exports are always current.
  */
 export const MIN_BACKUP_SCHEMA = 3;
 /** Text size cap (UTF-16 code units) for a pasted or picked backup and for an export. */
@@ -16,6 +17,8 @@ export const MAX_BACKUP_CHARS = 10_000_000;
 export const MAX_BACKUP_SUBJECTS = 2_000;
 export const MAX_BACKUP_SERIES = 5_000;
 export const MAX_BACKUP_LESSONS = 30_000;
+export const MAX_BACKUP_OBJECTIVES = 10_000;
+export const MAX_BACKUP_OBJECTIVE_LINKS = 60_000;
 export const MAX_CANCEL_REASON_LENGTH = MAX_NAME_LENGTH * 2;
 
 const MAX_TIMESTAMP = 8_640_000_000_000_000;
@@ -65,6 +68,22 @@ export type BackupLesson = {
   /** v4: 1 when the occurrence was edited on its own and series edits must skip it. */ series_exception: 0 | 1;
 };
 
+/** v5 */
+export type BackupObjective = {
+  id: number;
+  subject_id: number;
+  title: string;
+  status: 'open' | 'practising' | 'done';
+  created_at: number;
+  updated_at: number;
+  /** Basis date of the review suggestion the student dismissed. */
+  dismissed_review_basis: string | null;
+  dismissed_review_at: number | null;
+};
+
+/** v5: an objective the student tagged as worked on in a lesson. */
+export type BackupLessonObjective = { lesson_id: number; objective_id: number; created_at: number };
+
 /**
  * Everything the student recorded. Derived search columns and device preferences
  * (language, theme) are deliberately not part of a backup.
@@ -76,6 +95,8 @@ export type BackupDocument = {
   subjects: BackupSubject[];
   lesson_series: BackupSeries[];
   lessons: BackupLesson[];
+  /** v5 (empty when restoring an older document) */ learning_objectives: BackupObjective[];
+  /** v5 (empty when restoring an older document) */ lesson_objectives: BackupLessonObjective[];
 };
 
 declare const validated: unique symbol;
@@ -88,12 +109,13 @@ export type BackupErrorCode =
 
 export type BackupError = { code: BackupErrorCode; path?: string };
 
-export type BackupSummary = { exportedAt: string; schemaVersion: number; subjects: number; series: number; lessons: number };
+export type BackupSummary = { exportedAt: string; schemaVersion: number; subjects: number; series: number; lessons: number; objectives: number };
 
 export function summarizeBackup(document: BackupDocument): BackupSummary {
   return {
     exportedAt: document.exported_at, schemaVersion: document.schema_version,
     subjects: document.subjects.length, series: document.lesson_series.length, lessons: document.lessons.length,
+    objectives: document.learning_objectives.length,
   };
 }
 
@@ -162,11 +184,15 @@ function optionalText(value: unknown, path: string, max: number): string | null 
   return result;
 }
 
-/** Single-line name exactly as the app stores it: trimmed, inner whitespace collapsed. */
-function name(value: unknown, path: string): string {
-  const result = text(value, path, MAX_NAME_LENGTH);
+/** Single-line text exactly as the app stores it: trimmed, inner whitespace collapsed, never empty. */
+function singleLine(value: unknown, path: string, max: number): string {
+  const result = text(value, path, max);
   if (!result || result !== result.trim().replace(/\s+/g, ' ')) fail('invalidField', path);
   return result;
+}
+
+function name(value: unknown, path: string): string {
+  return singleLine(value, path, MAX_NAME_LENGTH);
 }
 
 /** Optional single-line value as the app stores it: trimmed, never blank. */
@@ -206,7 +232,10 @@ const LESSON_KEYS_V3 = [
 const SUBJECT_KEYS_V4 = [...SUBJECT_KEYS_V3, 'color', 'sort_order'] as const;
 const SERIES_KEYS_V4 = [...SERIES_KEYS_V3, 'teacher_name', 'planned_content'] as const;
 const LESSON_KEYS_V4 = [...LESSON_KEYS_V3, 'private_notes', 'next_step', 'series_exception'] as const;
-const TOP_KEYS = ['format', 'schema_version', 'exported_at', 'subjects', 'lesson_series', 'lessons'] as const;
+const OBJECTIVE_KEYS = ['id', 'subject_id', 'title', 'status', 'created_at', 'updated_at', 'dismissed_review_basis', 'dismissed_review_at'] as const;
+const LESSON_OBJECTIVE_KEYS = ['lesson_id', 'objective_id', 'created_at'] as const;
+const TOP_KEYS_V3 = ['format', 'schema_version', 'exported_at', 'subjects', 'lesson_series', 'lessons'] as const;
+const TOP_KEYS_V5 = [...TOP_KEYS_V3, 'learning_objectives', 'lesson_objectives'] as const;
 
 function parseDocument(input: unknown, appSchema: number): BackupDocument {
   if (!isObject(input) || input.format !== BACKUP_FORMAT) fail('notBackup');
@@ -214,9 +243,10 @@ function parseDocument(input: unknown, appSchema: number): BackupDocument {
   if (typeof schema !== 'number' || !Number.isSafeInteger(schema)) fail('invalidField', 'schema_version');
   if (schema > appSchema) fail('newerSchema');
   if (schema < MIN_BACKUP_SCHEMA) fail('olderSchema');
-  const top = exactKeys(input, TOP_KEYS, '$');
-  // Field sets are exact per version: a v3 document has no v4 keys and vice versa.
+  // Field sets are exact per version: an older document has no newer keys and vice versa.
   const v4 = schema >= 4;
+  const v5 = schema >= 5;
+  const top = exactKeys(input, v5 ? TOP_KEYS_V5 : TOP_KEYS_V3, '$');
   const exportedAt = text(top.exported_at, 'exported_at', 40);
   if (Number.isNaN(Date.parse(exportedAt))) fail('invalidField', 'exported_at');
 
@@ -299,7 +329,54 @@ function parseDocument(input: unknown, appSchema: number): BackupDocument {
     return lesson;
   });
 
-  return { format: BACKUP_FORMAT, schema_version: schema, exported_at: exportedAt, subjects, lesson_series: series, lessons };
+  const lessonSubjects = new Map(lessons.map((lesson) => [lesson.id, lesson.subject_id]));
+  const objectiveSubjects = new Map<number, number>();
+  const objectives = v5 ? list(top.learning_objectives, 'learning_objectives', MAX_BACKUP_OBJECTIVES).map((raw, index): BackupObjective => {
+    const path = `learning_objectives[${index}]`;
+    const row = exactKeys(raw, OBJECTIVE_KEYS, path);
+    const objective: BackupObjective = {
+      id: id(row.id, `${path}.id`),
+      subject_id: id(row.subject_id, `${path}.subject_id`),
+      title: singleLine(row.title, `${path}.title`, MAX_OBJECTIVE_TITLE),
+      status: oneOf(row.status, OBJECTIVE_STATUSES, `${path}.status`),
+      created_at: timestamp(row.created_at, `${path}.created_at`),
+      updated_at: timestamp(row.updated_at, `${path}.updated_at`),
+      dismissed_review_basis: row.dismissed_review_basis === null ? null : localDate(row.dismissed_review_basis, `${path}.dismissed_review_basis`),
+      dismissed_review_at: optionalTimestamp(row.dismissed_review_at, `${path}.dismissed_review_at`),
+    };
+    // The dismissal is a pair: both set or both empty.
+    if ((objective.dismissed_review_basis === null) !== (objective.dismissed_review_at === null)) fail('invalidField', `${path}.dismissed_review_at`);
+    if (objectiveSubjects.has(objective.id)) fail('duplicateId', `${path}.id`);
+    if (!subjectIds.has(objective.subject_id)) fail('missingReference', `${path}.subject_id`);
+    objectiveSubjects.set(objective.id, objective.subject_id);
+    return objective;
+  }) : [];
+
+  const linkKeys = new Set<string>();
+  const links = v5 ? list(top.lesson_objectives, 'lesson_objectives', MAX_BACKUP_OBJECTIVE_LINKS).map((raw, index): BackupLessonObjective => {
+    const path = `lesson_objectives[${index}]`;
+    const row = exactKeys(raw, LESSON_OBJECTIVE_KEYS, path);
+    const link: BackupLessonObjective = {
+      lesson_id: id(row.lesson_id, `${path}.lesson_id`),
+      objective_id: id(row.objective_id, `${path}.objective_id`),
+      created_at: timestamp(row.created_at, `${path}.created_at`),
+    };
+    const lessonSubject = lessonSubjects.get(link.lesson_id);
+    if (lessonSubject === undefined) fail('missingReference', `${path}.lesson_id`);
+    const objectiveSubject = objectiveSubjects.get(link.objective_id);
+    if (objectiveSubject === undefined) fail('missingReference', `${path}.objective_id`);
+    // A lesson can only be tagged with objectives of its own subject.
+    if (objectiveSubject !== lessonSubject) fail('invalidField', `${path}.objective_id`);
+    const key = `${link.lesson_id}:${link.objective_id}`;
+    if (linkKeys.has(key)) fail('duplicateId', path);
+    linkKeys.add(key);
+    return link;
+  }) : [];
+
+  return {
+    format: BACKUP_FORMAT, schema_version: schema, exported_at: exportedAt, subjects, lesson_series: series, lessons,
+    learning_objectives: objectives, lesson_objectives: links,
+  };
 }
 
 export type ValidationResult = { ok: true; value: ValidatedBackup } | { ok: false; error: BackupError };
@@ -307,7 +384,8 @@ export type ValidationResult = { ok: true; value: ValidatedBackup } | { ok: fals
 /**
  * Parses and validates backup text: format id, schema version (never newer than the
  * app), exact field sets, types, date/time formats, length limits, unique ids and
- * subject names, and referential integrity. Returns a fresh copy with only known fields.
+ * subject names, referential integrity and objective tags limited to the lesson's
+ * own subject. Returns a fresh copy with only known fields.
  */
 export function validateBackup(source: string, appSchema = SCHEMA_VERSION): ValidationResult {
   if (!source.trim()) return { ok: false, error: { code: 'empty' } };
