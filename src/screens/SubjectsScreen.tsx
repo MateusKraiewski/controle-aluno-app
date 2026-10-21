@@ -19,10 +19,10 @@ function ColorOption({ color, selected, onPress }: { color: SubjectColor | null;
   const { styles, t, palette } = useApp();
   const label = color ? colorName(t, color) : t.colorNone;
   return (
-    <Pressable accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ checked: selected }} hitSlop={4} onPress={onPress}
+    <Pressable accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ checked: selected }} onPress={onPress}
       style={({ pressed }) => [styles.chip, styles.colorChip, selected && styles.chipSelected, pressed && styles.pressed]}>
-      <View style={[styles.swatch, color ? { backgroundColor: palette.subject[color] } : styles.swatchEmpty]} />
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+      <View importantForAccessibility="no" style={[styles.swatch, color ? { backgroundColor: palette.subject[color] } : styles.swatchEmpty]} />
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{selected ? `✓ ${label}` : label}</Text>
     </Pressable>
   );
 }
@@ -104,7 +104,7 @@ export function SubjectsScreen({ revision, onChanged }: SubjectsScreenProps) {
         <Chip label={t.showArchived} selected={showArchived} onPress={() => setShowArchived((value) => !value)} />
       </View>
       <ErrorText message={error} />
-      {loading ? <ActivityIndicator color={palette.accent} style={{ marginTop: 24 }} /> : (
+      {loading ? <ActivityIndicator accessibilityLabel={t.loading} color={palette.accent} style={{ marginTop: 24 }} /> : (
         <FlatList
           data={subjects}
           keyExtractor={(item) => String(item.id)}

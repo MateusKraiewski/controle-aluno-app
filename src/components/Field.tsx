@@ -16,7 +16,7 @@ export function Field({ label, value, onChangeText, placeholder, multiline, keyb
   const { styles, palette } = useApp();
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={styles.fieldLabel} importantForAccessibility="no" accessibilityElementsHidden>{label}</Text>
       <TextInput
         accessibilityLabel={label}
         value={value}

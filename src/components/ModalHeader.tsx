@@ -9,7 +9,7 @@ export function ModalHeader({ eyebrow, title, onClose }: { eyebrow: string; titl
         <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
         <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel={t.close} onPress={onClose} hitSlop={8}>
+      <Pressable accessibilityRole="button" accessibilityLabel={t.close} onPress={onClose} style={({ pressed }) => pressed && styles.pressed}>
         <Text style={styles.close}>{t.close}</Text>
       </Pressable>
     </View>

@@ -9,7 +9,7 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (tab: T
   return (
     <View accessibilityRole="tablist" style={styles.tabBar}>
       {tabs.map(([key, label]) => (
-        <Pressable key={key} accessibilityRole="tab" accessibilityLabel={label} accessibilityState={{ selected: active === key }} onPress={() => onChange(key)} style={styles.tab}>
+        <Pressable key={key} accessibilityRole="tab" accessibilityLabel={label} accessibilityState={{ selected: active === key }} onPress={() => onChange(key)} style={({ pressed }) => [styles.tab, pressed && styles.pressed]}>
           {active === key && <View style={styles.tabIndicator} />}
           <Text style={[styles.tabText, active === key && styles.tabTextActive]}>{label}</Text>
         </Pressable>

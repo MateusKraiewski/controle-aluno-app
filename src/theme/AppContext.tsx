@@ -13,10 +13,12 @@ export type AppContextValue = {
   t: Translations;
   language: Language;
   isDark: boolean;
+  /** 'none' when the system asks to reduce motion. */
+  modalAnimation: 'none' | 'slide';
 };
 
 const AppContext = createContext<AppContextValue>({
-  styles: createStyles(lightPalette), palette: lightPalette, t: getTranslations('pt-BR'), language: 'pt-BR', isDark: false,
+  styles: createStyles(lightPalette), palette: lightPalette, t: getTranslations('pt-BR'), language: 'pt-BR', isDark: false, modalAnimation: 'slide',
 });
 
 export const AppContextProvider = AppContext.Provider;

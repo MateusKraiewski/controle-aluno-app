@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, SafeAreaView, Text, View, useColorScheme } from 'react-native';
+import { AccessibilityInfo, Pressable, SafeAreaView, Text, View, useColorScheme } from 'react-native';
 import { SQLiteProvider } from 'expo-sqlite';
 import { TabBar } from './src/components/TabBar';
 import type { TabKey } from './src/components/TabBar';
@@ -30,11 +30,12 @@ function AppShell() {
   // Bumped after every write so visible screens re-read their bounded queries.
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState('');
+  const [reduceMotion, setReduceMotion] = useState(false);
   const isDark = themePreference === 'dark' || (themePreference === 'system' && systemScheme === 'dark');
   const context = useMemo(() => {
     const palette = isDark ? darkPalette : lightPalette;
-    return { styles: createStyles(palette), palette, t: getTranslations(language), language, isDark };
-  }, [isDark, language]);
+    return { styles: createStyles(palette), palette, t: getTranslations(language), language, isDark, modalAnimation: reduceMotion ? 'none' as const : 'slide' as const };
+  }, [isDark, language, reduceMotion]);
   const { styles, t } = context;
 
   useEffect(() => {
@@ -42,6 +43,13 @@ function AppShell() {
       setLanguage(preferences.language);
       setThemePreference(preferences.theme);
     }).catch(() => undefined);
+  }, []);
+
+  // Modal slide animations follow the system "reduce motion" setting.
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => undefined);
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => subscription.remove();
   }, []);
 
   const changed = useCallback(() => setRevision((value) => value + 1), []);
@@ -69,9 +77,9 @@ function AppShell() {
               <Text style={styles.heroTitle}>{t.tagline}</Text>
             </View>
             <View style={styles.heroActions}>
-              <View style={styles.offlinePill}><View style={styles.onlineDot} /><Text style={styles.offlineText}>{t.offline}</Text></View>
+              <View style={styles.offlinePill} accessible accessibilityLabel={t.offline}><View style={styles.onlineDot} /><Text style={styles.offlineText}>{t.offline}</Text></View>
               <Pressable accessibilityRole="button" accessibilityLabel={t.settings} onPress={() => setShowSettings(true)} style={styles.settingsButton}>
-                <Text style={styles.settingsIcon}>⚙</Text>
+                <Text style={styles.settingsIcon} importantForAccessibility="no" accessibilityElementsHidden>⚙</Text>
               </Pressable>
             </View>
           </View>

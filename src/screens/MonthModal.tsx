@@ -17,8 +17,9 @@ type MonthModalProps = { initialDate: string | null; revision: number; onClose: 
 
 /** Monthly overview: lesson count per day; tapping a day opens its week in the agenda. */
 export function MonthModal({ initialDate, revision, onClose, onPickDay }: MonthModalProps) {
+  const { modalAnimation } = useApp();
   return (
-    <Modal visible={initialDate !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={initialDate !== null} animationType={modalAnimation} presentationStyle="pageSheet" onRequestClose={onClose}>
       {initialDate !== null && <MonthBody key={initialDate} initialDate={initialDate} revision={revision} onClose={onClose} onPickDay={onPickDay} />}
     </Modal>
   );
@@ -49,14 +50,14 @@ function MonthBody({ initialDate, revision, onClose, onPickDay }: { initialDate:
   for (let index = 0; index < grid.days.length; index += 7) weeks.push(grid.days.slice(index, index + 7));
 
   return (
-    <SafeAreaView style={styles.modalSafe}>
+    <SafeAreaView style={styles.modalSafe} accessibilityViewIsModal>
       <ScrollView contentContainerStyle={styles.form}>
         <ModalHeader eyebrow={t.monthEyebrow} title={monthLabel(month, language)} onClose={onClose} />
         <View style={styles.weekNav}>
           <Chip label="‹" accessibilityLabel={t.previousMonth} onPress={() => setMonth((value) => addMonths(value, -1))} />
           <Chip label={t.today} selected={month === addMonths(today, 0)} onPress={() => setMonth(addMonths(today, 0))} />
           <Chip label="›" accessibilityLabel={t.nextMonth} onPress={() => setMonth((value) => addMonths(value, 1))} />
-          {loading && <ActivityIndicator color={palette.accent} />}
+          {loading && <ActivityIndicator accessibilityLabel={t.loading} color={palette.accent} />}
         </View>
         <ErrorText message={error} />
         <View style={[styles.monthRow, { marginTop: 14 }]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
@@ -79,7 +80,7 @@ function MonthBody({ initialDate, revision, onClose, onPickDay }: { initialDate:
                 <Pressable key={day} accessibilityRole="button" accessibilityLabel={label} accessibilityHint={t.monthOpenWeek}
                   onPress={() => onPickDay(day)}
                   style={({ pressed }) => [styles.monthCell, day === today && styles.monthToday, pressed && styles.pressed]}>
-                  <Text style={[styles.monthDay, !inMonth && styles.monthOutside]}>{Number(day.slice(8))}</Text>
+                  <Text style={[styles.monthDay, !inMonth && styles.monthOutside, day === today && styles.monthTodayText]}>{Number(day.slice(8))}</Text>
                   {planned > 0 ? <Text style={styles.monthCount}>{planned}</Text> : <Text style={styles.monthCountEmpty}> </Text>}
                   {cancelled > 0 && <Text style={styles.monthCancelled}>{`−${cancelled}`}</Text>}
                 </Pressable>

@@ -51,7 +51,7 @@ export function LessonObjectives({ lessonId, subjectId, onChanged }: LessonObjec
           <Text style={styles.info}>{t.lessonObjectivesHint}</Text>
           <View style={styles.chipRow}>
             {objectives?.map((objective) => (
-              <Pressable key={objective.id} accessibilityRole="checkbox" accessibilityState={{ checked: objective.tagged }} hitSlop={4}
+              <Pressable key={objective.id} accessibilityRole="checkbox" accessibilityState={{ checked: objective.tagged }}
                 accessibilityLabel={`${objective.title} (${objectiveStatusLabel(t, objective.status)})`} onPress={() => void toggle(objective)}
                 style={({ pressed }) => [styles.chip, objective.tagged && styles.chipSelected, pressed && styles.pressed]}>
                 <Text style={[styles.chipText, objective.tagged && styles.chipTextSelected]}>{`${objective.tagged ? '☑' : '☐'} ${objective.title}`}</Text>

@@ -54,8 +54,9 @@ const DEFAULT_SERIES_WEEKS = 12;
 type EditorProps = { target: EditorTarget | null; onClose: () => void; onChanged: () => void };
 
 export function LessonEditorModal({ target, onClose, onChanged }: EditorProps) {
+  const { modalAnimation } = useApp();
   return (
-    <Modal visible={target !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={target !== null} animationType={modalAnimation} presentationStyle="pageSheet" onRequestClose={onClose}>
       {target && <EditorBody key={target.mode === 'edit' ? `edit-${target.id}` : `create-${target.localDate}`} target={target} onClose={onClose} onChanged={onChanged} />}
     </Modal>
   );
@@ -328,7 +329,7 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
   const editLoaded = !isEdit || lesson !== null;
 
   return (
-    <SafeAreaView style={styles.modalSafe}>
+    <SafeAreaView style={styles.modalSafe} accessibilityViewIsModal>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <ModalHeader eyebrow={isEdit ? t.editEyebrow : t.newOccurrence} title={isEdit ? t.editLesson : t.addLesson} onClose={onClose} />
@@ -337,7 +338,7 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
               {lesson?.seriesId != null && <Text style={styles.info}>{t.seriesNote}</Text>}
               <Field label={t.subject} value={subject} onChangeText={setSubject} placeholder={t.subjectPlaceholder} maxLength={MAX_NAME_LENGTH} />
               {quickSubjects.length > 0 && !isEdit && (
-                <View style={styles.chipRow} accessibilityLabel={t.subjectsQuick}>
+                <View style={styles.chipRow} accessible={false} accessibilityLabel={t.subjectsQuick}>
                   {quickSubjects.map((name) => <Chip key={name} label={name} selected={subject.trim().toLowerCase() === name.toLowerCase()} onPress={() => setSubject(name)} />)}
                 </View>
               )}
@@ -360,7 +361,7 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
 
               {!isEdit && (
                 <>
-                  <Text style={styles.fieldLabel}>{t.repeat}</Text>
+                  <Text accessibilityRole="header" style={styles.fieldLabel}>{t.repeat}</Text>
                   <View style={styles.chipRow}>
                     {([['none', t.repeatNone], ['weekly', t.weekly], ['biweekly', t.biweekly]] as [Repeat, string][]).map(([value, label]) => (
                       <Chip key={value} label={label} selected={repeat === value} onPress={() => chooseRepeat(value)} />
@@ -368,7 +369,7 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
                   </View>
                   {repeat !== 'none' && (
                     <>
-                      <Text style={styles.fieldLabel}>{t.weekdays}</Text>
+                      <Text accessibilityRole="header" style={styles.fieldLabel}>{t.weekdays}</Text>
                       <View style={styles.chipRow}>
                         {WEEKDAY_ORDER.map((day) => <Chip key={day} label={weekdayLabel(t, day)} selected={weekdays.includes(day)} onPress={() => toggleWeekday(day)} />)}
                       </View>
@@ -385,7 +386,8 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
               )}
 
               <ErrorText message={error} />
-              <Pressable accessibilityRole="button" disabled={busy || cancelled} onPress={() => void save()} style={[styles.saveButton, (busy || cancelled) && styles.disabled]}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t.save} accessibilityState={{ disabled: busy || cancelled, busy }} disabled={busy || cancelled} onPress={() => void save()}
+                style={({ pressed }) => [styles.saveButton, pressed && styles.pressed, (busy || cancelled) && styles.disabled]}>
                 <Text style={styles.saveButtonText}>{busy ? t.saving : t.save}</Text>
               </Pressable>
               <Text style={styles.privacyNote}>{t.privacy}</Text>
@@ -403,7 +405,7 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
                     })}
                   </Text>
                   <Field label={t.seriesEndNew} value={newEnd} onChangeText={setNewEnd} placeholder={series.endDate} keyboardType="numbers-and-punctuation" maxLength={10} />
-                  <Pressable accessibilityRole="button" disabled={busy || newEnd.trim() === series.endDate} onPress={() => void changeEnd()}
+                  <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy || newEnd.trim() === series.endDate, busy }} disabled={busy || newEnd.trim() === series.endDate} onPress={() => void changeEnd()}
                     style={[styles.secondaryButton, (busy || newEnd.trim() === series.endDate) && styles.disabled]}>
                     <Text style={styles.secondaryButtonText}>{t.seriesEndApply}</Text>
                   </Pressable>
@@ -419,7 +421,7 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
                     <>
                       <Text style={styles.info}>{t.cancelledNote}</Text>
                       {!!lesson.cancelReason && <Text style={styles.info}>{lesson.cancelReason}</Text>}
-                      <Pressable accessibilityRole="button" disabled={busy} onPress={() => void restore()} style={[styles.secondaryButton, busy && styles.disabled]}>
+                      <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void restore()} style={[styles.secondaryButton, busy && styles.disabled]}>
                         <Text style={styles.secondaryButtonText}>{t.restoreLesson}</Text>
                       </Pressable>
                     </>
@@ -429,12 +431,12 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
                       <View style={{ marginTop: 18 }}>
                         <Field label={t.cancelReason} value={cancelReason} onChangeText={setCancelReason} placeholder={t.cancelReasonPlaceholder} maxLength={MAX_NAME_LENGTH * 2} />
                       </View>
-                      <Pressable accessibilityRole="button" disabled={busy} onPress={() => void cancelLesson()} style={[styles.secondaryButton, busy && styles.disabled]}>
+                      <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void cancelLesson()} style={[styles.secondaryButton, busy && styles.disabled]}>
                         <Text style={styles.secondaryButtonText}>{t.cancelLesson}</Text>
                       </Pressable>
                     </>
                   )}
-                  <Pressable accessibilityRole="button" disabled={busy} onPress={() => void remove()} style={[styles.dangerButton, busy && styles.disabled]}>
+                  <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void remove()} style={[styles.dangerButton, busy && styles.disabled]}>
                     <Text style={styles.dangerButtonText}>{t.deleteLesson}</Text>
                   </Pressable>
                 </>

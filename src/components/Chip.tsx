@@ -7,21 +7,22 @@ type ChipProps = {
   onPress: () => void;
   accessibilityLabel?: string;
   disabled?: boolean;
+  /** For chips that show/hide a section. */
+  accessibilityState?: { expanded?: boolean };
 };
 
-export function Chip({ label, selected = false, onPress, accessibilityLabel, disabled }: ChipProps) {
+export function Chip({ label, selected = false, onPress, accessibilityLabel, disabled, accessibilityState }: ChipProps) {
   const { styles } = useApp();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ selected, disabled }}
+      accessibilityState={{ selected, disabled, ...accessibilityState }}
       disabled={disabled}
-      hitSlop={4}
       onPress={onPress}
       style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed, disabled && styles.disabled]}
     >
-      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{selected ? `✓ ${label}` : label}</Text>
     </Pressable>
   );
 }

@@ -31,8 +31,9 @@ type ObjectivesModalProps = { target: ObjectivesTarget | null; onClose: () => vo
 
 /** Learning objectives of one subject: list, add, rename and choose the status. */
 export function ObjectivesModal({ target, onClose, onChanged }: ObjectivesModalProps) {
+  const { modalAnimation } = useApp();
   return (
-    <Modal visible={target !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={target !== null} animationType={modalAnimation} presentationStyle="pageSheet" onRequestClose={onClose}>
       {target && <ObjectivesBody key={target.subjectId} target={target} onClose={onClose} onChanged={onChanged} />}
     </Modal>
   );
@@ -103,7 +104,7 @@ function ObjectivesBody({ target, onClose, onChanged }: { target: ObjectivesTarg
   }
 
   return (
-    <SafeAreaView style={styles.modalSafe}>
+    <SafeAreaView style={styles.modalSafe} accessibilityViewIsModal>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <ModalHeader eyebrow={t.objectivesEyebrow} title={target.subject} onClose={onClose} />
@@ -142,10 +143,10 @@ function ObjectivesBody({ target, onClose, onChanged }: { target: ObjectivesTarg
               </Text>
               <View accessibilityRole="radiogroup" accessibilityLabel={`${t.objectiveStatus}: ${objective.title}`} style={styles.rowActions}>
                 {OBJECTIVE_STATUSES.map((status) => (
-                  <Pressable key={status} accessibilityRole="radio" accessibilityState={{ checked: objective.status === status }} hitSlop={4}
+                  <Pressable key={status} accessibilityRole="radio" accessibilityState={{ checked: objective.status === status }}
                     accessibilityLabel={`${t.objectiveStatus}: ${objectiveStatusLabel(t, status)}`} onPress={() => void changeStatus(objective, status)}
                     style={({ pressed }) => [styles.chip, objective.status === status && styles.chipSelected, pressed && styles.pressed]}>
-                    <Text style={[styles.chipText, objective.status === status && styles.chipTextSelected]}>{objectiveStatusLabel(t, status)}</Text>
+                    <Text style={[styles.chipText, objective.status === status && styles.chipTextSelected]}>{objective.status === status ? `✓ ${objectiveStatusLabel(t, status)}` : objectiveStatusLabel(t, status)}</Text>
                   </Pressable>
                 ))}
               </View>

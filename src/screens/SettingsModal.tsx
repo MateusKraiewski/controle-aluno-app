@@ -1,4 +1,4 @@
-import { Modal, Pressable, SafeAreaView, ScrollView, Text } from 'react-native';
+import { Modal, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import { ModalHeader } from '../components/ModalHeader';
 import { DataSettings } from './DataSettings';
 import type { Language, ThemePreference } from '../lib/preferences';
@@ -17,25 +17,31 @@ type SettingsModalProps = {
 };
 
 export function SettingsModal({ visible, themePreference, onClose, onLanguage, onTheme, onDataChanged }: SettingsModalProps) {
-  const { styles, t, language } = useApp();
+  const { styles, t, language, modalAnimation } = useApp();
   const themes: [ThemePreference, string][] = [['system', t.system], ['light', t.light], ['dark', t.dark]];
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={styles.modalSafe}>
+    <Modal visible={visible} animationType={modalAnimation} presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={styles.modalSafe} accessibilityViewIsModal>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <ModalHeader eyebrow={t.settings} title={t.settings} onClose={onClose} />
-          <Text style={styles.fieldLabel}>{t.language}</Text>
-          {LANGUAGES.map(([value, label]) => (
-            <Pressable key={value} accessibilityRole="radio" accessibilityState={{ checked: language === value }} onPress={() => onLanguage(value)} style={[styles.option, language === value && styles.optionSelected]}>
-              <Text style={[styles.optionText, language === value && styles.optionTextSelected]}>{label}</Text>
-            </Pressable>
-          ))}
-          <Text style={[styles.fieldLabel, styles.themeLabel]}>{t.theme}</Text>
-          {themes.map(([value, label]) => (
-            <Pressable key={value} accessibilityRole="radio" accessibilityState={{ checked: themePreference === value }} onPress={() => onTheme(value)} style={[styles.option, themePreference === value && styles.optionSelected]}>
-              <Text style={[styles.optionText, themePreference === value && styles.optionTextSelected]}>{label}</Text>
-            </Pressable>
-          ))}
+          <Text accessibilityRole="header" style={styles.fieldLabel}>{t.language}</Text>
+          <View accessibilityRole="radiogroup" accessibilityLabel={t.language}>
+            {LANGUAGES.map(([value, label]) => (
+              <Pressable key={value} accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ checked: language === value }} onPress={() => onLanguage(value)}
+                style={({ pressed }) => [styles.option, language === value && styles.optionSelected, pressed && styles.pressed]}>
+                <Text style={[styles.optionText, language === value && styles.optionTextSelected]}>{language === value ? `✓ ${label}` : label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text accessibilityRole="header" style={[styles.fieldLabel, styles.themeLabel]}>{t.theme}</Text>
+          <View accessibilityRole="radiogroup" accessibilityLabel={t.theme}>
+            {themes.map(([value, label]) => (
+              <Pressable key={value} accessibilityRole="radio" accessibilityLabel={label} accessibilityState={{ checked: themePreference === value }} onPress={() => onTheme(value)}
+                style={({ pressed }) => [styles.option, themePreference === value && styles.optionSelected, pressed && styles.pressed]}>
+                <Text style={[styles.optionText, themePreference === value && styles.optionTextSelected]}>{themePreference === value ? `✓ ${label}` : label}</Text>
+              </Pressable>
+            ))}
+          </View>
           <DataSettings onChanged={onDataChanged} />
         </ScrollView>
       </SafeAreaView>

@@ -197,8 +197,8 @@ ${formatTemplate(t.restoreAttachmentsNote, { count: preview.attachments })}` : t
       <View style={[styles.listRow, { marginTop: 12 }]}>
         <Text style={styles.rowTitle}>{t.csvExport}</Text>
         <Text style={styles.rowMeta}>{t.csvCaption}</Text>
-        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: csvNotes, disabled }} accessibilityHint={t.csvIncludeNotesHint}
-          disabled={disabled} hitSlop={4} onPress={() => setCsvNotes((value) => !value)}
+        <Pressable accessibilityRole="checkbox" accessibilityLabel={t.csvIncludeNotes} accessibilityState={{ checked: csvNotes, disabled }} accessibilityHint={t.csvIncludeNotesHint}
+          disabled={disabled} onPress={() => setCsvNotes((value) => !value)}
           style={({ pressed }) => [styles.option, csvNotes && styles.optionSelected, pressed && styles.pressed]}>
           <Text style={[styles.optionText, csvNotes && styles.optionTextSelected]}>{`${csvNotes ? '☑' : '☐'} ${t.csvIncludeNotes}`}</Text>
         </Pressable>
@@ -232,11 +232,11 @@ ${formatTemplate(t.restoreAttachmentsNote, { count: preview.attachments })}` : t
             style={[styles.input, styles.multiline, { maxHeight: 180 }]}
           />
           <View style={[styles.formRow, { marginTop: 4 }]}>
-            <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void pickFile()}
+            <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={() => void pickFile()}
               style={({ pressed }) => [styles.secondaryButton, { flex: 1 }, pressed && styles.pressed, disabled && styles.disabled]}>
               <Text style={styles.secondaryButtonText}>{t.pickFile}</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void check(source)}
+            <Pressable accessibilityRole="button" accessibilityState={{ disabled, busy: busy === 'check' }} disabled={disabled} onPress={() => void check(source)}
               style={({ pressed }) => [styles.secondaryButton, { flex: 1 }, pressed && styles.pressed, disabled && styles.disabled]}>
               <Text style={styles.secondaryButtonText}>{busy === 'check' ? t.checking : t.checkBackup}</Text>
             </Pressable>

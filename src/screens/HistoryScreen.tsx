@@ -146,6 +146,7 @@ export function HistoryScreen({ revision, onOpen }: HistoryScreenProps) {
           label={period.from || period.to ? formatTemplate(t.periodActive, { from: period.from ? shortDate(period.from, language) : '…', to: period.to ? shortDate(period.to, language) : '…' }) : t.periodFilter}
           selected={showPeriod || period.from !== null || period.to !== null}
           accessibilityLabel={t.periodFilter}
+          accessibilityState={{ expanded: showPeriod }}
           onPress={() => setShowPeriod((value) => !value)}
         />
         {(period.from !== null || period.to !== null || !!fromInput || !!toInput) && (
@@ -160,7 +161,7 @@ export function HistoryScreen({ revision, onOpen }: HistoryScreenProps) {
       )}
       <ErrorText message={periodError} />
       <ErrorText message={error} />
-      {loading && items.length === 0 ? <ActivityIndicator color={palette.accent} style={{ marginTop: 24 }} /> : (
+      {loading && items.length === 0 ? <ActivityIndicator accessibilityLabel={t.loading} color={palette.accent} style={{ marginTop: 24 }} /> : (
         <FlatList
           data={items}
           keyExtractor={(item) => String(item.id)}
@@ -174,8 +175,9 @@ export function HistoryScreen({ revision, onOpen }: HistoryScreenProps) {
           removeClippedSubviews
           ListEmptyComponent={<Text style={styles.emptyText}>{t.historyEmpty}</Text>}
           ListFooterComponent={items.length === 0 ? undefined : hasMore ? (
-            <Pressable accessibilityRole="button" disabled={loadingMore} onPress={() => void loadMore()} style={[styles.secondaryButton, loadingMore && styles.disabled]}>
-              {loadingMore ? <ActivityIndicator color={palette.accent} /> : <Text style={styles.secondaryButtonText}>{t.loadMore}</Text>}
+            <Pressable accessibilityRole="button" accessibilityLabel={t.loadMore} accessibilityState={{ disabled: loadingMore, busy: loadingMore }} disabled={loadingMore} onPress={() => void loadMore()}
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed, loadingMore && styles.disabled]}>
+              {loadingMore ? <ActivityIndicator accessibilityLabel={t.loading} color={palette.accent} /> : <Text style={styles.secondaryButtonText}>{t.loadMore}</Text>}
             </Pressable>
           ) : <Text style={styles.retentionHint}>{t.historyEnd}</Text>}
         />

@@ -20,8 +20,9 @@ type BreakModalProps = { startDate: string | null; onClose: () => void; onChange
 
 /** Holiday/break: cancels planned, unrecorded lessons in a date range after a count preview. */
 export function BreakModal({ startDate, onClose, onChanged }: BreakModalProps) {
+  const { modalAnimation } = useApp();
   return (
-    <Modal visible={startDate !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={startDate !== null} animationType={modalAnimation} presentationStyle="pageSheet" onRequestClose={onClose}>
       {startDate !== null && <BreakBody key={startDate} startDate={startDate} onClose={onClose} onChanged={onChanged} />}
     </Modal>
   );
@@ -62,7 +63,7 @@ function BreakBody({ startDate, onClose, onChanged }: { startDate: string; onClo
   }
 
   return (
-    <SafeAreaView style={styles.modalSafe}>
+    <SafeAreaView style={styles.modalSafe} accessibilityViewIsModal>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <ModalHeader eyebrow={t.breakEyebrow} title={t.breakTitle} onClose={onClose} />

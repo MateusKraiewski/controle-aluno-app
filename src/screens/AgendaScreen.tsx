@@ -89,13 +89,13 @@ export function AgendaScreen({ revision, onOpen, onAdd, onChanged }: AgendaScree
       <MonthModal initialDate={monthStart} revision={revision} onClose={() => setMonthStart(null)}
         onPickDay={(day) => { setWeekStart(startOfWeek(day)); setMonthStart(null); }} />
       <ErrorText message={error} />
-      {loading && lessons.length === 0 ? <ActivityIndicator color={palette.accent} style={{ marginTop: 32 }} /> : lessons.length === 0 ? (
+      {loading && lessons.length === 0 ? <ActivityIndicator accessibilityLabel={t.loading} color={palette.accent} style={{ marginTop: 32 }} /> : lessons.length === 0 ? (
         <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>✳</Text>
+            <Text style={styles.emptyIcon} importantForAccessibility="no" accessibilityElementsHidden>✳</Text>
             <Text style={styles.emptyTitle}>{t.emptyTitle}</Text>
             <Text style={styles.emptyText}>{t.emptyBody}</Text>
-            <Pressable accessibilityRole="button" onPress={() => onAdd(addDate)} style={styles.emptyButton}><Text style={styles.emptyButtonText}>{t.firstLesson}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={t.firstLesson} onPress={() => onAdd(addDate)} style={({ pressed }) => [styles.emptyButton, pressed && styles.pressed]}><Text style={styles.emptyButtonText}>{t.firstLesson}</Text></Pressable>
           </View>
           <Text style={styles.retentionHint}>{t.offlineInfo}</Text>
         </ScrollView>
