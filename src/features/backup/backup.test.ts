@@ -6,7 +6,7 @@ import { SCHEMA_VERSION, migrate } from '../../db/migrations';
 import { openTestDatabase } from '../../testing/nodeSqlite';
 import { generateOccurrences } from '../lessons/domain';
 import { cancelLessons, createLesson, createLessonSeries, listHistoryPage, updateAttendance, updateLesson } from '../lessons/repository';
-import { setSubjectArchived, listSubjects } from '../subjects/repository';
+import { listSubjects, moveSubject, setSubjectArchived, setSubjectColor } from '../subjects/repository';
 import { BACKUP_FORMAT, MAX_BACKUP_CHARS, backupFileName, serializeBackup, summarizeBackup, validateBackup } from './format';
 import type { BackupDocument, BackupErrorCode } from './format';
 import { SchemaMismatchError, countLocalData, deleteAllData, exportBackup, restoreBackup } from './repository';
@@ -28,10 +28,10 @@ beforeEach(async () => {
 function snapshot(database: DatabaseSync): string {
   const dump = (sql: string) => database.prepare(sql).all().map((row) => ({ ...row }));
   return JSON.stringify({
-    subjects: dump('SELECT id, name, search_name, created_at, archived_at FROM subjects ORDER BY id'),
-    series: dump('SELECT id, subject_id, frequency, weekdays_mask, start_date, end_date, start_minute, duration_minutes, created_at FROM lesson_series ORDER BY id'),
+    subjects: dump('SELECT id, name, search_name, created_at, archived_at, color, sort_order FROM subjects ORDER BY id'),
+    series: dump('SELECT id, subject_id, frequency, weekdays_mask, start_date, end_date, start_minute, duration_minutes, created_at, teacher_name, planned_content FROM lesson_series ORDER BY id'),
     lessons: dump(`SELECT id, subject_id, teacher_name, local_date, start_minute, duration_minutes, planned_content, studied_content, attendance,
-      status, cancel_reason, series_id, original_local_date, created_at, updated_at, search_text FROM lessons ORDER BY id`),
+      status, cancel_reason, series_id, original_local_date, created_at, updated_at, private_notes, next_step, series_exception, search_text FROM lessons ORDER BY id`),
   });
 }
 
@@ -39,7 +39,7 @@ const base = { teacher: null, startMinute: 600, durationMinutes: 50, plannedCont
 
 async function seed(target: SQLiteDatabase) {
   const a = await createLesson(target, { ...base, subject: 'Física', teacher: 'José Álvares', localDate: '2026-10-01', plannedContent: "Ótica d'água\nlinha 2" });
-  await updateLesson(target, a, { ...base, subject: 'Física', teacher: 'José Álvares', localDate: '2026-10-01', plannedContent: "Ótica d'água\nlinha 2", studiedContent: 'Lentes 100% _ok_' });
+  await updateLesson(target, a, { ...base, subject: 'Física', teacher: 'José Álvares', localDate: '2026-10-01', plannedContent: "Ótica d'água\nlinha 2", studiedContent: 'Lentes 100% _ok_', privateNotes: 'Pedir lista à Ana', nextStep: 'Rever exercícios 3 e 4' });
   await updateAttendance(target, a, 'attended');
   const b = await createLesson(target, { ...base, subject: 'Química', localDate: '2026-10-02', startMinute: 900 });
   await updateAttendance(target, b, 'absent');
@@ -53,6 +53,10 @@ async function seed(target: SQLiteDatabase) {
   const historia = subjects.find((item) => item.name === 'História');
   assert.ok(historia && history);
   await setSubjectArchived(target, historia.id, true);
+  await setSubjectColor(target, historia.id, 'purple');
+  const quimica = subjects.find((item) => item.name === 'Química');
+  assert.ok(quimica);
+  await moveSubject(target, quimica.id, 'up');
 }
 
 function withoutExportedAt(document: BackupDocument) {
@@ -111,6 +115,8 @@ describe('backup round trip', () => {
     // Restored data is usable: accent-insensitive search and new writes work.
     const found = await listHistoryPage(target.db, { before: null, onOrBefore: '2026-12-31', subjectId: null, search: 'OTICA', limit: 10 });
     assert.equal(found.length, 1);
+    assert.deepEqual([found[0].privateNotes, found[0].nextStep], ['Pedir lista à Ana', 'Rever exercícios 3 e 4']);
+    assert.equal((await listHistoryPage(target.db, { before: null, onOrBefore: '2026-12-31', subjectId: null, search: 'rever EXERCICIOS', limit: 10 })).length, 1);
     await createLesson(target.db, { ...base, subject: 'física', localDate: '2026-12-01' });
     assert.equal((await countLocalData(target.db)).subjects, 4);
   });

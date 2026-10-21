@@ -19,6 +19,8 @@ type LessonRow = {
   duration_minutes: number;
   planned_content: string | null;
   studied_content: string | null;
+  private_notes: string | null;
+  next_step: string | null;
   attendance: Attendance;
   status: LessonStatus;
   cancel_reason: string | null;
@@ -30,7 +32,7 @@ type LessonRow = {
 };
 
 const LESSON_COLUMNS = `l.id, l.subject_id, s.name AS subject, l.teacher_name, l.local_date, l.start_minute,
-  l.duration_minutes, l.planned_content, l.studied_content, l.attendance, l.status, l.cancel_reason,
+  l.duration_minutes, l.planned_content, l.studied_content, l.private_notes, l.next_step, l.attendance, l.status, l.cancel_reason,
   l.series_id, l.series_exception, l.created_at, l.updated_at, s.color AS subject_color`;
 
 /**
@@ -46,7 +48,7 @@ function toLesson(row: LessonRow): Lesson {
   return {
     id: row.id, subjectId: row.subject_id, subject: row.subject, teacher: row.teacher_name, localDate: row.local_date,
     startMinute: row.start_minute, durationMinutes: row.duration_minutes, plannedContent: row.planned_content,
-    studiedContent: row.studied_content, attendance: row.attendance, status: row.status, cancelReason: row.cancel_reason,
+    studiedContent: row.studied_content, privateNotes: row.private_notes, nextStep: row.next_step, attendance: row.attendance, status: row.status, cancelReason: row.cancel_reason,
     seriesId: row.series_id, seriesException: row.series_exception === 1, createdAt: row.created_at, updatedAt: row.updated_at,
     subjectColor: isSubjectColor(row.subject_color) ? row.subject_color : null,
   };
@@ -175,14 +177,16 @@ export async function updateLesson(db: SQLiteDatabase, id: number, input: Lesson
     }
     await db.runAsync(`
       UPDATE lessons SET subject_id = $subject, teacher_name = $teacher, local_date = $date, start_minute = $start,
-        duration_minutes = $duration, planned_content = $planned, studied_content = $studied, search_text = $search, updated_at = $now,
+        duration_minutes = $duration, planned_content = $planned, studied_content = $studied, private_notes = $notes, next_step = $next,
+        search_text = $search, updated_at = $now,
         series_exception = CASE WHEN series_id IS NULL THEN 0 ELSE MAX(series_exception, EXISTS (
           SELECT 1 FROM lesson_series s WHERE s.id = lessons.series_id AND (
             s.subject_id <> $subject OR lessons.original_local_date IS NOT $date OR s.start_minute <> $start
             OR s.duration_minutes <> $duration OR s.teacher_name IS NOT $teacher OR s.planned_content IS NOT $planned))) END
       WHERE id = $id`, {
       $subject: subjectId, $teacher: input.teacher, $date: input.localDate, $start: input.startMinute, $duration: input.durationMinutes,
-      $planned: input.plannedContent, $studied: input.studiedContent, $search: lessonSearchText(input), $now: now, $id: id,
+      $planned: input.plannedContent, $studied: input.studiedContent, $notes: input.privateNotes, $next: input.nextStep,
+      $search: lessonSearchText(input), $now: now, $id: id,
     });
   });
   return { seriesUpdated };

@@ -40,11 +40,12 @@ async function byDate(): Promise<Map<string, Lesson>> {
 function update(lesson: Lesson, changes: Partial<Parameters<typeof updateLesson>[2]>) {
   return {
     subject: lesson.subject, teacher: lesson.teacher, localDate: lesson.localDate, startMinute: lesson.startMinute,
-    durationMinutes: lesson.durationMinutes, plannedContent: lesson.plannedContent, studiedContent: lesson.studiedContent, ...changes,
+    durationMinutes: lesson.durationMinutes, plannedContent: lesson.plannedContent, studiedContent: lesson.studiedContent,
+    privateNotes: lesson.privateNotes, nextStep: lesson.nextStep, ...changes,
   };
 }
 
-/** Records, cancels and edits some occurrences so only 20 Oct, 5, 10 and 12 Nov stay untouched. */
+/** Records, cancels and edits some occurrences so only 20 Oct, 10 and 12 Nov stay untouched. */
 async function touchSome() {
   const lessons = await byDate();
   const get = (date: string) => { const lesson = lessons.get(date); assert.ok(lesson, date); return lesson; };
@@ -52,6 +53,8 @@ async function touchSome() {
   await cancelLessons(db, get('2026-10-27').id, 'this', null);
   await updateLesson(db, get('2026-10-29').id, update(get('2026-10-29'), { plannedContent: 'Capítulo especial' }));
   await updateLesson(db, get('2026-11-03').id, update(get('2026-11-03'), { studiedContent: 'Revisão antecipada' }));
+  // A future lesson with only a next step written is also "recorded" and kept.
+  await updateLesson(db, get('2026-11-05').id, update(get('2026-11-05'), { nextStep: 'Levar calculadora' }));
   return lessons;
 }
 
@@ -95,18 +98,18 @@ describe('editing all occurrences of a series', () => {
     const first = lessons.get('2026-10-13');
     assert.ok(first);
     const targets = await listSeriesEditTargets(db, seriesId, first.id, NOW);
-    assert.deepEqual(targets.map((row) => row.localDate), ['2026-10-20', '2026-11-05', '2026-11-10', '2026-11-12']);
+    assert.deepEqual(targets.map((row) => row.localDate), ['2026-10-20', '2026-11-10', '2026-11-12']);
 
     const before = await byDate();
     const result = await updateLesson(db, first.id, update(first, { startMinute: 960, durationMinutes: 60, teacher: 'Rui', plannedContent: 'Novo plano' }), { scope: 'all', now: NOW });
-    assert.equal(result.seriesUpdated, 4);
+    assert.equal(result.seriesUpdated, 3);
     const after = await byDate();
-    for (const date of ['2026-10-13', '2026-10-20', '2026-11-05', '2026-11-10', '2026-11-12']) {
+    for (const date of ['2026-10-13', '2026-10-20', '2026-11-10', '2026-11-12']) {
       const lesson = after.get(date);
       assert.deepEqual([lesson?.startMinute, lesson?.durationMinutes, lesson?.teacher, lesson?.plannedContent, lesson?.seriesException], [960, 60, 'Rui', 'Novo plano', false], date);
     }
     // Past, recorded, cancelled, individually edited and studied occurrences keep everything.
-    for (const date of ['2026-10-15', '2026-10-22', '2026-10-27', '2026-10-29', '2026-11-03']) {
+    for (const date of ['2026-10-15', '2026-10-22', '2026-10-27', '2026-10-29', '2026-11-03', '2026-11-05']) {
       assert.deepEqual(after.get(date), before.get(date), date);
     }
     assert.equal(after.get('2026-10-29')?.seriesException, true);
@@ -114,7 +117,7 @@ describe('editing all occurrences of a series', () => {
     const series = await getSeries(db, seriesId);
     assert.deepEqual([series?.startMinute, series?.durationMinutes, series?.teacher, series?.plannedContent], [960, 60, 'Rui', 'Novo plano']);
     // Updated occurrences stay searchable by their new text.
-    assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM lessons WHERE search_text LIKE '%novo plano%'").get()?.n, 5);
+    assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM lessons WHERE search_text LIKE '%novo plano%'").get()?.n, 4);
   });
 
   it('does not touch a lesson that already started today', async () => {
@@ -159,14 +162,14 @@ describe('changing the series end date', () => {
     assert.deepEqual(await changeSeriesEnd(db, seriesId, '2026-11-26', { now: NOW }), { ok: true, value: { added: 0, removed: 0, seriesDeleted: false } });
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lessons').get()?.n, 14);
 
-    // Shorten to 28 Oct: the edited 29 Oct and the studied 3 Nov stay; 7 untouched go.
-    assert.deepEqual(await changeSeriesEnd(db, seriesId, '2026-10-28', { now: NOW, dryRun: true }), { ok: true, value: { added: 0, removed: 7, seriesDeleted: false } });
-    assert.deepEqual(await changeSeriesEnd(db, seriesId, '2026-10-28', { now: NOW }), { ok: true, value: { added: 0, removed: 7, seriesDeleted: false } });
-    assert.deepEqual([...(await byDate()).keys()], ['2026-10-13', '2026-10-15', '2026-10-20', '2026-10-22', '2026-10-27', '2026-10-29', '2026-11-03']);
+    // Shorten to 28 Oct: edited 29 Oct, studied 3 Nov and 5 Nov (next step) stay; 6 untouched go.
+    assert.deepEqual(await changeSeriesEnd(db, seriesId, '2026-10-28', { now: NOW, dryRun: true }), { ok: true, value: { added: 0, removed: 6, seriesDeleted: false } });
+    assert.deepEqual(await changeSeriesEnd(db, seriesId, '2026-10-28', { now: NOW }), { ok: true, value: { added: 0, removed: 6, seriesDeleted: false } });
+    assert.deepEqual([...(await byDate()).keys()], ['2026-10-13', '2026-10-15', '2026-10-20', '2026-10-22', '2026-10-27', '2026-10-29', '2026-11-03', '2026-11-05']);
     assert.equal((await getSeries(db, seriesId))?.endDate, '2026-10-28');
 
-    // Extending again recreates only the missing dates (29 Oct and 3 Nov still exist).
-    assert.deepEqual(await changeSeriesEnd(db, seriesId, '2026-11-12', { now: NOW }), { ok: true, value: { added: 3, removed: 0, seriesDeleted: false } });
+    // Extending again recreates only the missing dates (29 Oct, 3 and 5 Nov still exist).
+    assert.deepEqual(await changeSeriesEnd(db, seriesId, '2026-11-12', { now: NOW }), { ok: true, value: { added: 2, removed: 0, seriesDeleted: false } });
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lessons WHERE series_id = ?').get(seriesId)?.n, 10);
     assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM lessons WHERE original_local_date = '2026-10-29'").get()?.n, 1);
   });

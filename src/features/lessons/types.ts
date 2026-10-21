@@ -16,6 +16,10 @@ export type Lesson = {
   durationMinutes: number;
   plannedContent: string | null;
   studiedContent: string | null;
+  /** Private notes of the student, separate from the plan and from what was studied. */
+  privateNotes: string | null;
+  /** Next step / task after this lesson (e.g. revise, homework). */
+  nextStep: string | null;
   attendance: Attendance;
   status: LessonStatus;
   cancelReason: string | null;
@@ -35,7 +39,7 @@ export type NewLesson = {
   plannedContent: string | null;
 };
 
-export type LessonUpdate = NewLesson & { studiedContent: string | null };
+export type LessonUpdate = NewLesson & { studiedContent: string | null; privateNotes: string | null; nextStep: string | null };
 
 export type NewSeries = NewLesson & {
   frequency: Frequency;

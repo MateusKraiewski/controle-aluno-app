@@ -38,12 +38,14 @@ describe('lessons repository', () => {
 
   it('edits one lesson including studied content', async () => {
     const id = await createLesson(db, lesson());
-    await updateLesson(db, id, { ...lesson({ subject: 'Física', teacher: 'Rui', startMinute: 600 }), studiedContent: 'Leis de Newton' });
+    await updateLesson(db, id, { ...lesson({ subject: 'Física', teacher: 'Rui', startMinute: 600 }), studiedContent: 'Leis de Newton', privateNotes: 'Só para mim', nextStep: 'Resolver a ficha 2' });
     const stored = await getLesson(db, id);
     assert.equal(stored?.subject, 'Física');
     assert.equal(stored?.teacher, 'Rui');
     assert.equal(stored?.startMinute, 600);
     assert.equal(stored?.studiedContent, 'Leis de Newton');
+    assert.equal(stored?.privateNotes, 'Só para mim');
+    assert.equal(stored?.nextStep, 'Resolver a ficha 2');
     assert.ok(stored?.updatedAt);
   });
 
@@ -176,11 +178,13 @@ describe('accent-insensitive search keys', () => {
   it('keeps search columns in sync on create, edit, series and rename', async () => {
     const search = (term: string) => listHistoryPage(db, { before: null, onOrBefore: '2026-12-31', subjectId: null, search: term, limit: 50 });
     const id = await createLesson(db, lesson({ subject: 'Educação Física', teacher: 'José Álvares', localDate: '2026-10-01' }));
-    await updateLesson(db, id, { ...lesson({ subject: 'Educação Física', teacher: 'José Álvares', localDate: '2026-10-01' }), studiedContent: 'Revisão de ÓTICA' });
+    await updateLesson(db, id, { ...lesson({ subject: 'Educação Física', teacher: 'José Álvares', localDate: '2026-10-01' }), studiedContent: 'Revisão de ÓTICA', privateNotes: 'Dúvida sobre LENTES', nextStep: 'Pedir Exercícios extra' });
     assert.equal((await search('EDUCACAO')).length, 1);
     assert.equal((await search('jose alvares')).length, 1);
     assert.equal((await search('otica')).length, 1);
     assert.equal((await search('revisão')).length, 1);
+    assert.equal((await search('duvida sobre lentes')).length, 1); // private notes
+    assert.equal((await search('EXERCICIOS EXTRA')).length, 1); // next step
     assert.equal((await search('xyz')).length, 0);
 
     const generated = generateOccurrences({ startDate: '2026-10-05', endDate: '2026-10-12', weekdays: [1], frequency: 'weekly' });

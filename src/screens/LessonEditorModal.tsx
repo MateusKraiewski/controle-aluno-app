@@ -69,6 +69,8 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
   const [duration, setDuration] = useState('60');
   const [plannedContent, setPlannedContent] = useState('');
   const [studiedContent, setStudiedContent] = useState('');
+  const [privateNotes, setPrivateNotes] = useState('');
+  const [nextStep, setNextStep] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [repeat, setRepeat] = useState<Repeat>('none');
   const [weekdays, setWeekdays] = useState<number[]>([]);
@@ -113,6 +115,8 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
       setDuration(String(row.durationMinutes));
       setPlannedContent(row.plannedContent ?? '');
       setStudiedContent(row.studiedContent ?? '');
+      setPrivateNotes(row.privateNotes ?? '');
+      setNextStep(row.nextStep ?? '');
       setCancelReason(row.cancelReason ?? '');
     }).catch(() => { if (active) setError(t.loadError); });
     return () => { active = false; };
@@ -150,7 +154,7 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
   }
 
   async function save() {
-    const validation = validateLessonDraft({ subject, teacher, localDate: date, time, duration, plannedContent, studiedContent });
+    const validation = validateLessonDraft({ subject, teacher, localDate: date, time, duration, plannedContent, studiedContent, privateNotes, nextStep });
     if (!validation.ok) { setError(t[DRAFT_ERRORS[validation.error]]); return; }
     const draft = validation.value;
     let dates: string[] | null = null;
@@ -185,7 +189,7 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
       if (!(await confirmConflicts(draft, dates, ignoreIds))) return;
       const base = { subject: draft.subject, teacher: draft.teacher, localDate: draft.localDate, startMinute: draft.startMinute, durationMinutes: draft.durationMinutes, plannedContent: draft.plannedContent };
       if (target.mode === 'edit') {
-        await updateLesson(db, target.id, { ...base, studiedContent: draft.studiedContent }, { scope });
+        await updateLesson(db, target.id, { ...base, studiedContent: draft.studiedContent, privateNotes: draft.privateNotes, nextStep: draft.nextStep }, { scope });
       } else if (dates && repeat !== 'none') {
         await createLessonSeries(db, { ...base, localDate: dates[0], frequency: repeat, weekdays, endDate: endDate.trim(), dates });
       } else {
@@ -333,7 +337,13 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
               </View>
               <Field label={t.duration} value={duration} onChangeText={setDuration} placeholder="60" keyboardType="number-pad" maxLength={3} />
               <Field label={t.planned} value={plannedContent} onChangeText={setPlannedContent} placeholder={t.plannedPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
-              {isEdit && <Field label={t.studied} value={studiedContent} onChangeText={setStudiedContent} placeholder={t.studiedPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />}
+              {isEdit && (
+                <>
+                  <Field label={t.studied} value={studiedContent} onChangeText={setStudiedContent} placeholder={t.studiedPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
+                  <Field label={t.nextStep} value={nextStep} onChangeText={setNextStep} placeholder={t.nextStepPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
+                  <Field label={t.privateNotes} value={privateNotes} onChangeText={setPrivateNotes} placeholder={t.privateNotesPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
+                </>
+              )}
 
               {!isEdit && (
                 <>

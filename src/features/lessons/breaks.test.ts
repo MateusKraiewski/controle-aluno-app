@@ -36,7 +36,7 @@ describe('holiday or break', () => {
     const attended = await createLesson(db, lesson('2026-12-22'));
     await updateAttendance(db, attended, 'attended');
     const studied = await createLesson(db, lesson('2026-12-23'));
-    await updateLesson(db, studied, { ...lesson('2026-12-23'), studiedContent: 'Revisão' });
+    await updateLesson(db, studied, { ...lesson('2026-12-23'), studiedContent: 'Revisão', privateNotes: null, nextStep: null });
     const absent = await createLesson(db, lesson('2026-12-29'));
     await updateAttendance(db, absent, 'absent');
     const last = await createLesson(db, lesson('2027-01-02'));

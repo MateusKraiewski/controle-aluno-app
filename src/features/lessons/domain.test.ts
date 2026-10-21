@@ -65,7 +65,9 @@ describe('validateLessonDraft', () => {
 
   it('normalises a valid draft', () => {
     const result = validateLessonDraft(base);
-    assert.deepEqual(result, { ok: true, value: { subject: 'Matemática', teacher: null, localDate: '2026-10-20', startMinute: 900, durationMinutes: 60, plannedContent: null, studiedContent: null } });
+    assert.deepEqual(result, { ok: true, value: { subject: 'Matemática', teacher: null, localDate: '2026-10-20', startMinute: 900, durationMinutes: 60, plannedContent: null, studiedContent: null, privateNotes: null, nextStep: null } });
+    const withNotes = validateLessonDraft({ ...base, privateNotes: '  Pedir ajuda ', nextStep: 'Rever 3.2' });
+    assert.deepEqual(withNotes.ok && [withNotes.value.privateNotes, withNotes.value.nextStep], ['Pedir ajuda', 'Rever 3.2']);
   });
 
   it('reports the first invalid field', () => {
@@ -75,6 +77,8 @@ describe('validateLessonDraft', () => {
     assert.deepEqual(validateLessonDraft({ ...base, time: '25:00' }), { ok: false, error: 'time' });
     assert.deepEqual(validateLessonDraft({ ...base, duration: '1000' }), { ok: false, error: 'duration' });
     assert.deepEqual(validateLessonDraft({ ...base, plannedContent: 'x'.repeat(2001) }), { ok: false, error: 'textTooLong' });
+    assert.deepEqual(validateLessonDraft({ ...base, privateNotes: 'x'.repeat(2001) }), { ok: false, error: 'textTooLong' });
+    assert.deepEqual(validateLessonDraft({ ...base, nextStep: 'x'.repeat(2001) }), { ok: false, error: 'textTooLong' });
   });
 
   it('keeps quotes and accents literal', () => {

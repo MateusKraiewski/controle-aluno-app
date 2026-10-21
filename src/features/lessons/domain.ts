@@ -104,6 +104,8 @@ export type LessonDraftInput = {
   duration: string;
   plannedContent: string;
   studiedContent?: string;
+  privateNotes?: string;
+  nextStep?: string;
 };
 
 export type LessonDraft = {
@@ -114,6 +116,8 @@ export type LessonDraft = {
   durationMinutes: number;
   plannedContent: string | null;
   studiedContent: string | null;
+  privateNotes: string | null;
+  nextStep: string | null;
 };
 
 export type DraftError = 'subjectRequired' | 'subjectTooLong' | 'teacherTooLong' | 'dateFormat' | 'dateInvalid' | 'time' | 'duration' | 'textTooLong';
@@ -140,10 +144,12 @@ export function validateLessonDraft(input: LessonDraftInput): Result<LessonDraft
   if (durationMinutes === null) return { ok: false, error: 'duration' };
   const plannedContent = optionalText(input.plannedContent);
   const studiedContent = optionalText(input.studiedContent);
-  if ((plannedContent?.length ?? 0) > MAX_TEXT_LENGTH || (studiedContent?.length ?? 0) > MAX_TEXT_LENGTH) {
+  const privateNotes = optionalText(input.privateNotes);
+  const nextStep = optionalText(input.nextStep);
+  if ([plannedContent, studiedContent, privateNotes, nextStep].some((text) => (text?.length ?? 0) > MAX_TEXT_LENGTH)) {
     return { ok: false, error: 'textTooLong' };
   }
-  return { ok: true, value: { subject, teacher, localDate, startMinute, durationMinutes, plannedContent, studiedContent } };
+  return { ok: true, value: { subject, teacher, localDate, startMinute, durationMinutes, plannedContent, studiedContent, privateNotes, nextStep } };
 }
 
 export type RecurrenceInput = {

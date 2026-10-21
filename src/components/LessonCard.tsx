@@ -44,6 +44,7 @@ export const LessonCard = memo(function LessonCard({ lesson, accentIndex, onOpen
           {lesson.studiedContent
             ? <Text numberOfLines={2} style={styles.lessonNote}>{t.studiedPrefix} {lesson.studiedContent}</Text>
             : !!lesson.plannedContent && <Text numberOfLines={2} style={styles.lessonNote}>{t.plannedPrefix} {lesson.plannedContent}</Text>}
+          {!cancelled && !!lesson.nextStep && <Text numberOfLines={2} style={styles.lessonNote}>{t.nextStepPrefix} {lesson.nextStep}</Text>}
           {cancelled && !!lesson.cancelReason && <Text numberOfLines={2} style={styles.lessonNote}>{lesson.cancelReason}</Text>}
         </Pressable>
         {!cancelled && onAttendance && <AttendancePicker value={lesson.attendance} onChange={(next) => onAttendance(lesson, next)} />}
