@@ -1,5 +1,5 @@
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { Modal, Pressable, ScrollView, Text, View, SafeAreaView } from 'react-native';
+import { androidTopInset } from '../theme/insets';
 import { ModalHeader } from '../components/ModalHeader';
 import { DataSettings } from './DataSettings';
 import type { Language, ThemePreference } from '../lib/preferences';
@@ -22,7 +22,7 @@ export function SettingsModal({ visible, themePreference, onClose, onLanguage, o
   const themes: [ThemePreference, string][] = [['system', t.system], ['light', t.light], ['dark', t.dark]];
   return (
     <Modal visible={visible} animationType={modalAnimation} presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaProvider><SafeAreaView style={styles.modalSafe} accessibilityViewIsModal>
+      <SafeAreaView style={[styles.modalSafe, { paddingTop: androidTopInset }]} accessibilityViewIsModal>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <ModalHeader eyebrow={t.settings} title={t.settings} onClose={onClose} />
           <Text accessibilityRole="header" style={styles.fieldLabel}>{t.language}</Text>
@@ -45,7 +45,7 @@ export function SettingsModal({ visible, themePreference, onClose, onLanguage, o
           </View>
           <DataSettings onChanged={onDataChanged} />
         </ScrollView>
-      </SafeAreaView></SafeAreaProvider>
+      </SafeAreaView>
     </Modal>
   );
 }

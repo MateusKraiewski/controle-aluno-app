@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View, SafeAreaView } from 'react-native';
+import { androidTopInset } from '../theme/insets';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Chip } from '../components/Chip';
 import { ErrorText } from '../components/ErrorText';
@@ -105,7 +105,7 @@ function ObjectivesBody({ target, onClose, onChanged }: { target: ObjectivesTarg
   }
 
   return (
-    <SafeAreaProvider><SafeAreaView style={styles.modalSafe} accessibilityViewIsModal>
+    <SafeAreaView style={[styles.modalSafe, { paddingTop: androidTopInset }]} accessibilityViewIsModal>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <ModalHeader eyebrow={t.objectivesEyebrow} title={target.subject} onClose={onClose} />
@@ -166,6 +166,6 @@ function ObjectivesBody({ target, onClose, onChanged }: { target: ObjectivesTarg
           ))}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView></SafeAreaProvider>
+    </SafeAreaView>
   );
 }

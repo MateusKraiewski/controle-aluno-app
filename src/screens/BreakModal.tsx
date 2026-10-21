@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, SafeAreaView } from 'react-native';
+import { androidTopInset } from '../theme/insets';
 import { useSQLiteContext } from 'expo-sqlite';
 import { ErrorText } from '../components/ErrorText';
 import { Field } from '../components/Field';
@@ -64,7 +64,7 @@ function BreakBody({ startDate, onClose, onChanged }: { startDate: string; onClo
   }
 
   return (
-    <SafeAreaProvider><SafeAreaView style={styles.modalSafe} accessibilityViewIsModal>
+    <SafeAreaView style={[styles.modalSafe, { paddingTop: androidTopInset }]} accessibilityViewIsModal>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <ModalHeader eyebrow={t.breakEyebrow} title={t.breakTitle} onClose={onClose} />
@@ -80,6 +80,6 @@ function BreakBody({ startDate, onClose, onChanged }: { startDate: string; onClo
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView></SafeAreaProvider>
+    </SafeAreaView>
   );
 }

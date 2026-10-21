@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AccessibilityInfo, Pressable, Text, View, useColorScheme } from 'react-native';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { androidTopInset } from './src/theme/insets';
 import { SQLiteProvider } from 'expo-sqlite';
 import { TabBar } from './src/components/TabBar';
 import type { TabKey } from './src/components/TabBar';
@@ -23,7 +23,6 @@ import { createStyles } from './src/theme/styles';
 
 function AppShell() {
   const systemScheme = useColorScheme();
-  const insets = useSafeAreaInsets();
   const [language, setLanguage] = useState<Language>('pt-BR');
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const [tab, setTab] = useState<TabKey>('agenda');
@@ -70,10 +69,10 @@ function AppShell() {
 
   return (
     <AppContextProvider value={context}>
-      {/* Android 15 draws edge to edge: the green header extends under the status bar and the tab bar clears the gesture area. */}
-      <View style={[styles.safe, { paddingBottom: insets.bottom }]}>
+      {/* Android 15 draws edge to edge: the green header extends under the status bar. */}
+      <View style={styles.safe}>
         <StatusBar style="light" />
-        <View style={[styles.hero, { paddingTop: 18 + insets.top }]}>
+        <View style={[styles.hero, { paddingTop: 18 + androidTopInset }]}>
           <View style={styles.heroTop}>
             <View style={{ flex: 1 }}>
               <Text style={styles.brand}>AULA EM DIA</Text>
@@ -108,10 +107,8 @@ function AppShell() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <SQLiteProvider databaseName="aula-em-dia.db" onInit={initializeDatabase}>
-        <AppShell />
-      </SQLiteProvider>
-    </SafeAreaProvider>
+    <SQLiteProvider databaseName="aula-em-dia.db" onInit={initializeDatabase}>
+      <AppShell />
+    </SQLiteProvider>
   );
 }
