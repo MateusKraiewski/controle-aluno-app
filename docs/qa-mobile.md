@@ -3,12 +3,12 @@
 ## Automatizado nesta cópia
 
 - `npm run typecheck` — app e ficheiros de teste.
-- `npm test` — 47 casos com `node --test` (Node 24): validação de data/hora/duração, semanas e DST, geração semanal/quinzenal com limite de 300, sobreposição, escape de `LIKE`, normalização sem acentos/maiúsculas; migração (base nova, v1→v2 e v2→v3 com dados preservados e backfill acima de uma página, rollback com falha injetada em v2 e v3, versão futura recusada); repositórios (agenda, edição, cancelar sem registar falta, séries com “esta e as seguintes”, rollback de série inválida, histórico paginado sem duplicados, filtro, pesquisa com `%`/`_`/aspas, “FÍSICA”/“fisica” encontram “Física”, chaves de pesquisa atualizadas em criar/editar/série/renomear, renomear/arquivar matérias); cópia de segurança (formato sem colunas derivadas, exportação com mais de uma página, ida e volta exportar→validar→restaurar noutra base com todas as linhas iguais, restauro vazio, 33 variantes inválidas rejeitadas sem alterar dados, cópia de esquema mais recente recusada mesmo se entregue diretamente ao restauro, falha injetada na última inserção com rollback total) e eliminação total (contagens, base utilizável depois, rollback com falha injetada). Correm sobre `node:sqlite`, não sobre o SQLite nativo do aparelho.
+- `npm test` — 68 casos com `node --test` (Node 24): validação de data/hora/duração (incluindo apontamentos e próximo passo), semanas e DST, geração semanal/quinzenal com limite de 300, planeamento da data final da série (estender só datas futuras depois do fim antigo, sem duplicar; erros de formato, início, 1 ano e 300 aulas), intervalos de datas, grelha mensal (viragem de ano, meses de 4–6 linhas), sobreposição, escape de `LIKE`, normalização sem acentos/maiúsculas; migração (base nova, v1→v2, v2→v3 e v3→v4 com dados preservados coluna a coluna, derivação do modelo da série e das ocorrências editadas à parte, rollback com falha injetada em v2, v3 e v4, versão futura recusada); repositórios (agenda, edição, cancelar sem registar falta, séries com “esta e as seguintes”, “todas as futuras” sem tocar em aulas passadas, já começadas hoje, registadas, canceladas, com estudado/próximo passo ou editadas à parte, “só esta” marcando a exceção, estender/encurtar/reestender com pré-visualização e rollback com falha injetada, feriado/pausa com limites inclusivos e aulas registadas intactas, histórico paginado sem duplicados com filtro por matéria, período e pesquisa, pesquisa em apontamentos e próximo passo, cor de matéria recusando chaves desconhecidas, ordem manual dentro de ativas/arquivadas, contagens por dia); cópia de segurança (exportação v4 com todos os campos, ida e volta com apontamentos, cor e ordem, restauro de cópia v3 com estado derivado, variantes inválidas v3/v4 rejeitadas sem alterar dados, cópia de esquema mais recente recusada, falha injetada no restauro com rollback total) e eliminação total. Correm sobre `node:sqlite`, não sobre o SQLite nativo do aparelho.
 - `npx expo-doctor`
 - Bundle Android e iOS com `npx expo export --platform android --platform ios`
 - `npm audit` analisado; ver a secção de dependências abaixo.
 
-Última execução (20/10/2026, Windows, Node 24.18, depois de adicionar `expo-file-system` ~58.0.10 e `expo-sharing` ~58.0.19 com `npx expo install`): typecheck sem erros; `npm test` 47/47; `expo-doctor` 20/20; `expo export --platform android --platform ios` (para uma pasta temporária fora do repositório) concluído, bundles Hermes de 1,9 MB cada (iOS 701 módulos, Android 699). Não houve execução em emulador ou aparelho.
+Última execução (21/10/2026, Windows, Node 24.18, depois de todo o código da Fase 1 e do esquema v4): `npm run typecheck` sem erros; `npm test` 68/68 (24 suites); `npx expo-doctor` 20/20 verificações; `npx expo export --platform android --platform ios --output-dir <pasta temporária fora do repositório>` concluído, bundles Hermes de ~2 MB cada (Android 702 módulos, iOS 704). Não houve execução em emulador ou aparelho.
 
 Não há ainda testes de componentes React Native nem testes ponta a ponta; os ecrãs só foram verificados por TypeScript e bundling.
 
@@ -22,7 +22,7 @@ Não há ainda testes de componentes React Native nem testes ponta a ponta; os e
 6. Excluir: aparece confirmação; “Voltar” não apaga; numa série, “Só esta” e “Esta e as seguintes”.
 7. Histórico: aulas até hoje, mais recentes primeiro; “Carregar mais” sem duplicados; filtro por matéria; pesquisar `100%`, `_`, apóstrofo e acentos.
 8. Matérias: renomear para nome existente (com outra capitalização) mostra erro; arquivar esconde das sugestões e não apaga aulas; “Mostrar arquivadas”.
-9. Atualizar a partir de instalações anteriores (esquema v1 e v2) com aulas gravadas: nenhuma aula desaparece, presença antiga mantém-se e a pesquisa sem acentos encontra aulas antigas (backfill v3).
+9. Atualizar a partir de instalações anteriores (esquema v1, v2 e v3) com aulas gravadas: nenhuma aula desaparece, presença antiga mantém-se, a pesquisa sem acentos encontra aulas antigas (backfill v3) e ocorrências de séries editadas antes (outro horário, data movida, outro plano) não mudam com “todas as futuras” (derivação v4).
 10. Leitor de ecrã (TalkBack/VoiceOver) nos separadores, cartões, chips de presença e alertas; escala de texto grande; tema escuro.
 11. Pesquisa: “FISICA”, “fisica” e “Física” dão o mesmo resultado; pesquisar nome de professor e conteúdo estudado com e sem acentos; renomear matéria e pesquisar pelo novo nome.
 12. Exportar cópia: abre a folha de partilha; guardar em Ficheiros/Drive/e-mail; abrir o ficheiro e confirmar `format`, `schema_version` e ausência de idioma/tema. Testar sem apps de destino e em modo avião (guardar localmente).
@@ -31,6 +31,14 @@ Não há ainda testes de componentes React Native nem testes ponta a ponta; os e
 15. Restaurar texto truncado, JSON de outra app, cópia com `schema_version` maior e cópia com uma data inválida: mensagem clara e nenhum dado alterado.
 16. Cópia grande (milhares de aulas): medir tempo e memória da exportação, colagem e restauro; matar a app durante o restauro e confirmar que reabre com os dados antigos ou os novos, nunca uma mistura.
 17. “Apagar todos os meus dados”: “Voltar” em qualquer dos dois alertas não apaga; confirmar apaga matérias e aulas, mantém idioma e tema e a app continua utilizável.
+18. Série: numa aula futura da repetição mudar a hora e escolher “Todas as futuras”; o diálogo mostra a contagem; confirmar que mudam só as aulas futuras sem registo; aulas passadas, com presença, canceladas, com estudado/próximo passo ou editadas à parte ficam iguais. Repetir com “Só esta” e verificar que essa aula deixa de seguir a série. “Voltar” não grava nada.
+19. Série: estender a data final (contagem “criadas” confere com a agenda; repetir a mesma data não duplica); encurtar (só somem aulas futuras sem registo; as registadas ficam); data inválida, antes do início, mais de 1 ano e mais de 300 aulas mostram mensagem.
+20. Feriado/pausa: intervalo com aulas planeadas, uma com presença e uma com estudado; o alerta mostra a contagem certa; “Voltar” não muda nada; confirmar cancela só as planeadas sem registo com o motivo; nenhuma conta como falta; reativar uma; intervalo sem aulas mostra “Nenhuma aula…”.
+21. Histórico: “Período” com só “De”, só “Até”, ambos, data inválida (mensagem, filtro anterior mantém-se) e “Até” no futuro (nunca aparecem aulas futuras); combinar com matéria e pesquisa; “Carregar mais” sem duplicados; “Limpar período”.
+22. Matérias: escolher cor (rótulo com nome em cada opção; “Sem cor”), ver a cor no cartão da agenda/histórico nos dois temas; subir/descer (setas desativadas nas pontas e entre ativas/arquivadas); a ordem aparece nos filtros do histórico e nas sugestões do editor.
+23. Apontamentos privados e próximo passo: gravar, reabrir, pesquisar sem acentos; o próximo passo aparece no cartão e os apontamentos não; exportar e restaurar mantém ambos.
+24. Calendário mensal: navegar meses (incluindo viragem de ano) e “Hoje”; números conferem com a agenda; canceladas aparecem como “−N”; tocar num dia abre a semana; leitor de ecrã lê data, contagem e canceladas; texto grande não corta a grelha.
+25. Restaurar uma cópia exportada pela versão anterior (`schema_version` 3): aceita, campos novos vazios.
 
 ## Testes manuais antes de chamar uma instalação de pronta
 
@@ -47,6 +55,9 @@ Não há ainda testes de componentes React Native nem testes ponta a ponta; os e
 ## Limites conhecidos da interface
 
 - Datas e horas são campos de texto validados (`AAAA-MM-DD`, `HH:MM`); não há seletor nativo para evitar dependências nativas novas.
+- “Todas as futuras” usa o relógio do aparelho para decidir o que é futuro; um relógio errado muda o conjunto afetado (o diálogo mostra a contagem antes de gravar).
+- Estender uma série não mostra aviso de sobreposição para as datas criadas.
+- A grelha mensal usa 7 colunas; com escala de texto muito grande pode ficar apertada (por ensaiar).
 - `SafeAreaView` do React Native continua em uso (como na fundação); avaliar `react-native-safe-area-context` se houver problemas de recorte em aparelhos com notch.
 - O Android mostra no máximo três botões num alerta; os diálogos de alcance usam exatamente três (Voltar, Só esta, Esta e as seguintes).
 - O botão de voltar do Android fecha modais; nos separadores, sai da app.

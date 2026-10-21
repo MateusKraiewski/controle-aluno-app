@@ -8,14 +8,17 @@
 
 ## Fase 1 — rotina e histórico do aluno
 
-**Em curso (código implementado, sem ensaio em aparelho).** Legenda: ✅ implementado · ◐ parcial · ○ por fazer.
+**Código completo, sem ensaio em aparelho.** Todos os itens abaixo estão implementados e cobertos por testes de domínio/repositório em `node:sqlite`; nenhum foi ensaiado em Android ou iPhone, por isso a fase não está “aceite”. Legenda: ✅ implementado (código) · ◐ parcial · ○ por fazer.
 
-- ◐ Cadastro/edição/arquivo de matérias com cor e ordem escolhidas — renomear e arquivar feitos; cor e ordem por fazer.
-- ◐ Semana navegável, lista diária, calendário mensal e avisos de sobreposição que deixam a decisão explícita — semana navegável agrupada por dia e aviso de sobreposição feitos; calendário mensal por fazer.
-- ◐ Recorrências semanais/quinzenais, exceções por feriado, e edição de uma/esta e próximas/todas — criação semanal/quinzenal, edição “só esta”, cancelar/excluir “esta e as seguintes” feitos; editar todas/seguintes, mudar a regra e feriados por fazer.
-- ◐ Registo posterior de conteúdo realmente estudado, apontamentos privados, tarefa/revisão e estado da aula, separados do plano — conteúdo estudado e estado (planeada/cancelada) feitos; apontamentos e tarefas por fazer.
-- ◐ Histórico com filtro por matéria/período, busca local e paginação por cursor composto — matéria, busca local sem distinção de acentos/maiúsculas e cursor feitos; período por fazer.
-- ✅ Exportar/restaurar cópia local (JSON versionado, validação estrita, substituição total numa transação) e eliminar todos os dados por iniciativa do aluno (confirmação em dois passos) — falta ensaio em aparelho.
+- ✅ Cadastro/edição/arquivo de matérias com cor e ordem escolhidas — renomear, arquivar, cor de paleta fixa acessível (sempre com nome) e ordem manual (subir/descer).
+- ✅ Semana navegável, lista diária, calendário mensal e avisos de sobreposição que deixam a decisão explícita — calendário mensal com contagem por dia que abre a semana. Falta aviso de sobreposição ao estender uma série.
+- ✅ Recorrências semanais/quinzenais, exceções por feriado, e edição de uma/todas — editar “só esta” ou “todas as futuras” (só ocorrências futuras, planeadas, sem registos e não editadas à parte), mudar a data final (estender idempotente / encurtar só futuras intactas), feriado/pausa por período, cancelar/excluir “esta e as seguintes”. Mudar dias da semana ou frequência de uma série existente continua fora do escopo (criar nova repetição).
+- ✅ Registo posterior de conteúdo realmente estudado, apontamentos privados, tarefa/revisão (“próximo passo”) e estado da aula, separados do plano.
+- ✅ Histórico com filtro por matéria/período, busca local (inclui apontamentos e próximo passo) e paginação por cursor composto.
+- ✅ Exportar/restaurar cópia local (JSON versionado v4, aceita v3, validação estrita, substituição total numa transação) e eliminar todos os dados por iniciativa do aluno (confirmação em dois passos).
+- ○ Seletores nativos de data/hora (hoje: texto validado `AAAA-MM-DD`/`HH:MM`).
+
+**Aceite pendente:** executar o checklist “Testes manuais da Fase 1” de `docs/qa-mobile.md` em Android e iPhone (ou emuladores), incluindo atualização a partir de bases v1/v2/v3.
 
 ## Fase 2 — confiabilidade e acessibilidade
 
