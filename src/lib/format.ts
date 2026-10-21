@@ -29,3 +29,13 @@ export function dateTime(iso: string, language: Language): string {
   if (Number.isNaN(date.getTime())) return iso;
   return date.toLocaleString(language, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+
+/** "outubro de 2026" for the month containing `localDate`. */
+export function monthLabel(localDate: string, language: Language): string {
+  return toDate(localDate).toLocaleDateString(language, { month: 'long', year: 'numeric' });
+}
+
+/** Long date with weekday, for screen-reader labels of calendar cells. */
+export function longDate(localDate: string, language: Language): string {
+  return toDate(localDate).toLocaleDateString(language, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}

@@ -97,5 +97,14 @@ export function createStyles(colors: Palette) {
     swatch: { width: 14, height: 14, borderRadius: 7 },
     swatchEmpty: { borderWidth: 1, borderColor: colors.muted },
     subjectTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    monthRow: { flexDirection: 'row' },
+    monthWeekday: { flex: 1, textAlign: 'center', color: colors.muted, fontSize: 11, fontWeight: '700', paddingBottom: 6 },
+    monthCell: { flex: 1, minHeight: 58, alignItems: 'center', paddingTop: 6, margin: 2, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
+    monthToday: { borderColor: colors.accent, borderWidth: 2 },
+    monthDay: { color: colors.ink, fontSize: 13, fontWeight: '700' },
+    monthOutside: { color: colors.muted, fontWeight: '400' },
+    monthCount: { color: colors.onGreen, backgroundColor: colors.green, fontSize: 11, fontWeight: '800', minWidth: 20, textAlign: 'center', borderRadius: 10, overflow: 'hidden', marginTop: 4, paddingHorizontal: 5 },
+    monthCountEmpty: { fontSize: 11, marginTop: 4 },
+    monthCancelled: { color: colors.danger, fontSize: 10, fontWeight: '700', marginTop: 2 },
   });
 }

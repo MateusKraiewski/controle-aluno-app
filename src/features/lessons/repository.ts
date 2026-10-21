@@ -346,6 +346,17 @@ export async function deleteLessons(db: SQLiteDatabase, id: number, scope: Scope
   return changes;
 }
 
+export type DayCount = { localDate: string; planned: number; cancelled: number };
+
+/** Per-day lesson counts in [from, to) for the monthly overview; at most 62 rows (one per day). */
+export async function countLessonsByDay(db: SQLiteDatabase, from: string, to: string): Promise<DayCount[]> {
+  const rows = await db.getAllAsync<{ local_date: string; planned: number; cancelled: number }>(`
+    SELECT local_date, SUM(status = 'planned') AS planned, SUM(status = 'cancelled') AS cancelled
+    FROM lessons WHERE local_date >= ? AND local_date < ?
+    GROUP BY local_date ORDER BY local_date LIMIT 62`, from, to);
+  return rows.map((row) => ({ localDate: row.local_date, planned: row.planned, cancelled: row.cancelled }));
+}
+
 // A holiday/break cancels lessons that are still planned and have nothing recorded
 // (no attendance, no studied content). Inclusive date range, bound parameters.
 const BREAK_TARGETS = `local_date >= ? AND local_date <= ? AND status = 'planned' AND attendance = 'unmarked' AND studied_content IS NULL`;

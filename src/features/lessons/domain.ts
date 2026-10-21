@@ -310,3 +310,26 @@ export function formatTemplate(template: string, values: Record<string, string |
 function pad(value: number): string {
   return String(value).padStart(2, '0');
 }
+
+/** First day (YYYY-MM-01) of the month `offset` months after the month of `localDate`. */
+export function addMonths(localDate: string, offset: number): string {
+  const parts = parseLocalDate(localDate);
+  if (!parts) throw new RangeError(`Invalid local date: ${localDate}`);
+  const index = parts.year * 12 + (parts.month - 1) + Math.trunc(offset);
+  return `${Math.floor(index / 12)}-${pad((index % 12) + 1)}-01`;
+}
+
+/**
+ * Monday-first grid for the month containing `localDate`: whole weeks from the Monday
+ * on or before the 1st to the Sunday on or after the last day (4–6 rows of 7 dates).
+ * `to` is exclusive, ready for a half-open range query.
+ */
+export function monthGrid(localDate: string): { month: string; from: string; to: string; days: string[] } {
+  const month = addMonths(localDate, 0);
+  const next = addMonths(localDate, 1);
+  const from = startOfWeek(month);
+  const to = addDays(startOfWeek(addDays(next, -1)), 7);
+  const days: string[] = [];
+  for (let day = from; day < to; day = addDays(day, 1)) days.push(day);
+  return { month, from, to, days };
+}
