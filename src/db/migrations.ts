@@ -3,7 +3,7 @@
 // the columns they add; v5 and v6 only create new tables (and v6 one trigger).
 import { lessonSearchText, normalizeForSearch } from '../lib/text';
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /** Rows per backfill page, so a long history is never read into memory at once. */
 const BACKFILL_PAGE = 500;
@@ -112,6 +112,17 @@ const V5 = `
 // transaction through a trigger, so the file is removed after commit and a crash in
 // between leaves a pending cleanup, never a row pointing at a file the app deleted.
 // New tables, index and trigger only; no existing row or column is touched.
+// v7: school lunch menu imported from the school's PDF, one row per date (meals as JSON).
+const V7 = `
+  CREATE TABLE lunch_days (
+    local_date TEXT PRIMARY KEY CHECK(length(local_date) = 10),
+    holiday INTEGER NOT NULL DEFAULT 0 CHECK(holiday IN (0, 1)),
+    meals TEXT NOT NULL,
+    source_name TEXT,
+    imported_at INTEGER NOT NULL
+  );
+`;
+
 const V6 = `
   CREATE TABLE lesson_attachments (
     id INTEGER PRIMARY KEY,
@@ -201,6 +212,7 @@ export async function migrate(db: MigrationDatabase): Promise<number> {
     }
     if (current < 5) await db.execAsync(V5);
     if (current < 6) await db.execAsync(V6);
+    if (current < 7) await db.execAsync(V7);
     await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   });
   return SCHEMA_VERSION;

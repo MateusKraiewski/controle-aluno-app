@@ -94,7 +94,7 @@ describe('migrations', () => {
     const { db, raw } = openTestDatabase();
     assert.equal(await migrate(db), SCHEMA_VERSION);
     const tables = raw.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all().map((row) => row.name);
-    assert.deepEqual(tables, ['attachment_trash', 'learning_objectives', 'lesson_attachments', 'lesson_objectives', 'lesson_series', 'lessons', 'subjects']);
+    assert.deepEqual(tables, ['attachment_trash', 'learning_objectives', 'lesson_attachments', 'lesson_objectives', 'lesson_series', 'lessons', 'lunch_days', 'subjects']);
     // Idempotent on reopen.
     assert.equal(await migrate(db), SCHEMA_VERSION);
   });
@@ -319,8 +319,8 @@ describe('migrations', () => {
     };
     const before = Object.fromEntries(Object.entries(tables).map(([key, sql]) => [key, dump(sql)]));
 
-    assert.equal(await migrate(db), 6);
-    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, 6);
+    assert.equal(await migrate(db), SCHEMA_VERSION);
+    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
     assert.deepEqual(Object.fromEntries(Object.entries(tables).map(([key, sql]) => [key, dump(sql)])), before);
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lesson_attachments').get()?.n, 0);
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM attachment_trash').get()?.n, 0);
@@ -338,7 +338,7 @@ describe('migrations', () => {
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM lesson_attachments').get()?.n, 0);
     assert.deepEqual(raw.prepare('SELECT file_name FROM attachment_trash').all().map((row) => row.file_name), [name]);
     assert.equal(raw.prepare('SELECT COUNT(*) AS n FROM learning_objectives').get()?.n, 1);
-    assert.equal(await migrate(db), 6); // idempotent on reopen
+    assert.equal(await migrate(db), SCHEMA_VERSION); // idempotent on reopen
   });
 
   it('rolls back a failed v6 upgrade and keeps v5 intact', async () => {

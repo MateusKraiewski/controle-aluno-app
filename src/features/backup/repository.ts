@@ -216,6 +216,8 @@ export async function deleteAllData(db: SQLiteDatabase): Promise<{ deleted: Data
   await db.withTransactionAsync(async () => {
     deleted = await countAll(db);
     await db.execAsync(DELETE_EVERYTHING);
+    // The lunch menu is not part of backups, so restore keeps it; deleting everything removes it too.
+    await db.execAsync('DELETE FROM lunch_days');
   });
   let compacted = true;
   try {

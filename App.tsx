@@ -17,6 +17,7 @@ import { LessonEditorModal } from './src/screens/LessonEditorModal';
 import type { EditorTarget } from './src/screens/LessonEditorModal';
 import { SettingsModal } from './src/screens/SettingsModal';
 import { SubjectsScreen } from './src/screens/SubjectsScreen';
+import { LunchScreen } from './src/screens/LunchScreen';
 import { AppContextProvider } from './src/theme/AppContext';
 import { darkPalette, lightPalette } from './src/theme/palette';
 import { createStyles } from './src/theme/styles';
@@ -90,6 +91,7 @@ function AppShell() {
         {tab === 'agenda' && <AgendaScreen revision={revision} onOpen={openLesson} onAdd={addLesson} onChanged={changed} />}
         {tab === 'history' && <HistoryScreen revision={revision} onOpen={openLesson} />}
         {tab === 'subjects' && <SubjectsScreen revision={revision} onChanged={changed} />}
+        {tab === 'lunch' && <LunchScreen revision={revision} onChanged={changed} />}
         <TabBar active={tab} onChange={setTab} />
         <LessonEditorModal target={editor} onClose={closeEditor} onChanged={changed} />
         <SettingsModal

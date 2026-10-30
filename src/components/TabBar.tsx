@@ -1,11 +1,11 @@
 import { Pressable, Text, View } from 'react-native';
 import { useApp } from '../theme/AppContext';
 
-export type TabKey = 'agenda' | 'history' | 'subjects';
+export type TabKey = 'agenda' | 'history' | 'lunch' | 'subjects';
 
 export function TabBar({ active, onChange }: { active: TabKey; onChange: (tab: TabKey) => void }) {
   const { styles, t } = useApp();
-  const tabs: [TabKey, string][] = [['agenda', t.tabAgenda], ['history', t.tabHistory], ['subjects', t.tabSubjects]];
+  const tabs: [TabKey, string][] = [['agenda', t.tabAgenda], ['history', t.tabHistory], ['lunch', t.tabLunch], ['subjects', t.tabSubjects]];
   return (
     <View accessibilityRole="tablist" style={styles.tabBar}>
       {tabs.map(([key, label]) => (
