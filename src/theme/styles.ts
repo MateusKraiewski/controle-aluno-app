@@ -65,6 +65,7 @@ export function createStyles(colors: Palette) {
     close: { color: colors.accent, fontSize: 13, fontWeight: '700', padding: 12, minHeight: 44, minWidth: 44, textAlign: 'center', textAlignVertical: 'center' },
     field: { marginBottom: 15, flex: 1 },
     fieldLabel: { color: colors.ink, fontSize: 12, fontWeight: '700', marginBottom: 7 },
+    pickerValue: { color: colors.ink, fontSize: 16, fontWeight: '700' },
     input: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 13, minHeight: 48, paddingHorizontal: 13, paddingVertical: 12, color: colors.ink, fontSize: 14 },
     multiline: { minHeight: 86, textAlignVertical: 'top' },
     formRow: { flexDirection: 'row', gap: 11 },

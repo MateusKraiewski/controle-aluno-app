@@ -80,7 +80,6 @@ function AppShell() {
               <Text style={styles.heroTitle}>{t.tagline}</Text>
             </View>
             <View style={styles.heroActions}>
-              <View style={styles.offlinePill} accessible accessibilityLabel={t.offline}><View style={styles.onlineDot} /><Text style={styles.offlineText}>{t.offline}</Text></View>
               <Pressable accessibilityRole="button" accessibilityLabel={t.settings} onPress={() => setShowSettings(true)} style={styles.settingsButton}>
                 <Text style={styles.settingsIcon} importantForAccessibility="no" accessibilityElementsHidden>⚙</Text>
               </Pressable>

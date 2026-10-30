@@ -6,6 +6,7 @@ import { AttendancePicker } from '../components/AttendancePicker';
 import { Chip } from '../components/Chip';
 import { ErrorText } from '../components/ErrorText';
 import { Field } from '../components/Field';
+import { DatePickerField, DurationPickerField, TimePickerField } from '../components/Pickers';
 import { ModalHeader } from '../components/ModalHeader';
 import {
   MAX_NAME_LENGTH, MAX_OCCURRENCES, MAX_TEXT_LENGTH, addDays, findConflicts, findSeriesConflicts, formatTemplate,
@@ -83,6 +84,8 @@ function EditorBody({ target, onClose, onChanged }: { target: EditorTarget; onCl
   const [endDate, setEndDate] = useState('');
   const [quickSubjects, setQuickSubjects] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showManage, setShowManage] = useState(false);
   const [error, setError] = useState('');
   const [series, setSeries] = useState<SeriesInfo | null>(null);
   const [newEnd, setNewEnd] = useState('');
@@ -337,21 +340,36 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
           {isEdit && !editLoaded ? <ErrorText message={error} /> : (
             <>
               {lesson?.seriesId != null && <Text style={styles.info}>{t.seriesNote}</Text>}
-              <Field label={t.subject} value={subject} onChangeText={setSubject} placeholder={t.subjectPlaceholder} maxLength={MAX_NAME_LENGTH} />
-              {quickSubjects.length > 0 && !isEdit && (
-                <View style={styles.chipRow} accessible={false} accessibilityLabel={t.subjectsQuick}>
-                  {quickSubjects.map((name) => <Chip key={name} label={name} selected={subject.trim().toLowerCase() === name.toLowerCase()} onPress={() => setSubject(name)} />)}
+              {/* The most common action after a class comes first when editing. */}
+              {lesson && !cancelled && (
+                <View style={{ marginBottom: 14 }}>
+                  <AttendancePicker label={t.ownAttendance} value={lesson.attendance} onChange={(next) => void changeAttendance(next)} />
                 </View>
               )}
-              <Field label={t.teacher} value={teacher} onChangeText={setTeacher} placeholder={t.teacherPlaceholder} maxLength={MAX_NAME_LENGTH} />
-              <View style={styles.formRow}>
-                <View style={{ flex: 1.3 }}><Field label={t.date} value={date} onChangeText={setDate} placeholder="2026-10-20" keyboardType="numbers-and-punctuation" maxLength={10} /></View>
-                <View style={{ flex: 1 }}><Field label={t.time} value={time} onChangeText={setTime} placeholder="15:00" keyboardType="numbers-and-punctuation" maxLength={5} /></View>
+              {quickSubjects.length > 0 && !isEdit && (
+                <>
+                  <Text style={styles.fieldLabel}>{t.yourSubjects}</Text>
+                  <View style={styles.chipRow} accessible={false} accessibilityLabel={t.subjectsQuick}>
+                    {quickSubjects.map((name) => <Chip key={name} label={name} selected={subject.trim().toLowerCase() === name.toLowerCase()} onPress={() => setSubject(name)} />)}
+                  </View>
+                </>
+              )}
+              <Field label={quickSubjects.length > 0 && !isEdit ? t.otherSubject : t.subject} value={subject} onChangeText={setSubject} placeholder={t.subjectPlaceholder} maxLength={MAX_NAME_LENGTH} />
+              <DatePickerField label={t.dateLabel} value={date} onChange={setDate} />
+              <TimePickerField label={t.timeLabel} value={time} onChange={setTime} />
+              <DurationPickerField label={t.durationLabel} value={duration} onChange={setDuration} />
+              <View style={styles.chipRow}>
+                <Chip label={showDetails ? t.lessDetails : t.moreDetails} accessibilityState={{ expanded: showDetails }} onPress={() => setShowDetails((value) => !value)} />
               </View>
-              <Field label={t.duration} value={duration} onChangeText={setDuration} placeholder="60" keyboardType="number-pad" maxLength={3} />
-              <Field label={t.planned} value={plannedContent} onChangeText={setPlannedContent} placeholder={t.plannedPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
+              {showDetails && (
+                <>
+                  <Field label={t.teacher} value={teacher} onChangeText={setTeacher} placeholder={t.teacherPlaceholder} maxLength={MAX_NAME_LENGTH} />
+                  <Field label={t.planned} value={plannedContent} onChangeText={setPlannedContent} placeholder={t.plannedPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
+                </>
+              )}
               {isEdit && (
                 <>
+                  <Text accessibilityRole="header" style={[styles.fieldLabel, { marginTop: 6 }]}>{t.afterClass}</Text>
                   <Field label={t.studied} value={studiedContent} onChangeText={setStudiedContent} placeholder={t.studiedPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
                   <Field label={t.nextStep} value={nextStep} onChangeText={setNextStep} placeholder={t.nextStepPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
                   <Field label={t.privateNotes} value={privateNotes} onChangeText={setPrivateNotes} placeholder={t.privateNotesPlaceholder} multiline maxLength={MAX_TEXT_LENGTH} />
@@ -374,7 +392,7 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
                       <View style={styles.chipRow}>
                         {WEEKDAY_ORDER.map((day) => <Chip key={day} label={weekdayLabel(t, day)} selected={weekdays.includes(day)} onPress={() => toggleWeekday(day)} />)}
                       </View>
-                      <Field label={t.endDate} value={endDate} onChangeText={setEndDate} placeholder={addDays(isValidLocalDate(date) ? date : '2026-10-20', 83)} keyboardType="numbers-and-punctuation" maxLength={10} />
+                      <DatePickerField label={t.repeatUntil} value={endDate} onChange={setEndDate} min={isValidLocalDate(date) ? date : undefined} />
                       {preview?.ok && (
                         <Text style={styles.info}>
                           {formatTemplate(t.seriesPreview, { count: preview.value.dates.length })}
@@ -387,13 +405,18 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
               )}
 
               <ErrorText message={error} />
-              <Pressable accessibilityRole="button" accessibilityLabel={t.save} accessibilityState={{ disabled: busy || cancelled, busy }} disabled={busy || cancelled} onPress={() => void save()}
+              <Pressable accessibilityRole="button" accessibilityLabel={t.saveLesson} accessibilityState={{ disabled: busy || cancelled, busy }} disabled={busy || cancelled} onPress={() => void save()}
                 style={({ pressed }) => [styles.saveButton, pressed && styles.pressed, (busy || cancelled) && styles.disabled]}>
-                <Text style={styles.saveButtonText}>{busy ? t.saving : t.save}</Text>
+                <Text style={styles.saveButtonText}>{busy ? t.saving : t.saveLesson}</Text>
               </Pressable>
-              <Text style={styles.privacyNote}>{t.privacy}</Text>
 
-              {lesson && series && (
+              {lesson && (
+                <View style={[styles.chipRow, { marginTop: 18 }]}>
+                  <Chip label={t.manageLesson} accessibilityState={{ expanded: showManage }} onPress={() => setShowManage((value) => !value)} />
+                </View>
+              )}
+
+              {showManage && lesson && series && (
                 <>
                   <View style={styles.divider} />
                   <Text accessibilityRole="header" style={styles.fieldLabel}>{t.seriesSection}</Text>
@@ -405,7 +428,7 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
                       end: shortDate(series.endDate, language),
                     })}
                   </Text>
-                  <Field label={t.seriesEndNew} value={newEnd} onChangeText={setNewEnd} placeholder={series.endDate} keyboardType="numbers-and-punctuation" maxLength={10} />
+                  <DatePickerField label={t.seriesEndNew} value={newEnd} onChange={setNewEnd} min={series.startDate} />
                   <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy || newEnd.trim() === series.endDate, busy }} disabled={busy || newEnd.trim() === series.endDate} onPress={() => void changeEnd()}
                     style={[styles.secondaryButton, (busy || newEnd.trim() === series.endDate) && styles.disabled]}>
                     <Text style={styles.secondaryButtonText}>{t.seriesEndApply}</Text>
@@ -415,7 +438,7 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
                 </>
               )}
 
-              {lesson && (
+              {lesson && (cancelled || showManage) && (
                 <>
                   <View style={styles.divider} />
                   {cancelled ? (
@@ -428,8 +451,7 @@ ${formatTemplate(t.deleteAttachmentsNote, { count: attachments })}`;
                     </>
                   ) : (
                     <>
-                      <AttendancePicker label={t.ownAttendance} value={lesson.attendance} onChange={(next) => void changeAttendance(next)} />
-                      <View style={{ marginTop: 18 }}>
+                      <View style={{ marginTop: 6 }}>
                         <Field label={t.cancelReason} value={cancelReason} onChangeText={setCancelReason} placeholder={t.cancelReasonPlaceholder} maxLength={MAX_NAME_LENGTH * 2} />
                       </View>
                       <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void cancelLesson()} style={[styles.secondaryButton, busy && styles.disabled]}>

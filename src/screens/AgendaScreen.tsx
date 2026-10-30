@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Chip } from '../components/Chip';
 import { ErrorText } from '../components/ErrorText';
@@ -80,10 +80,15 @@ export function AgendaScreen({ revision, onOpen, onAdd, onChanged }: AgendaScree
       </View>
       <View style={[styles.weekNav, { marginTop: 12 }]}>
         <Chip label="‹" accessibilityLabel={t.previousWeek} onPress={() => setWeekStart((week) => addDays(week, -7))} />
-        <Chip label={t.today} selected={isCurrentWeek} onPress={() => setWeekStart(currentWeek)} />
+        {!isCurrentWeek && <Chip label={t.today} onPress={() => setWeekStart(currentWeek)} />}
         <Chip label="›" accessibilityLabel={t.nextWeek} onPress={() => setWeekStart((week) => addDays(week, 7))} />
-        <Chip label={t.monthOpen} onPress={() => setMonthStart(weekStart)} />
-        <Chip label={t.breakOpen} onPress={() => setBreakStart(addDate)} />
+        <View style={{ flex: 1 }} />
+        {/* Less frequent actions live behind one button so the week stays the focus. */}
+        <Chip label={`${t.moreActions} ⋯`} onPress={() => Alert.alert(t.moreActions, undefined, [
+          { text: t.monthOpenAction, onPress: () => setMonthStart(weekStart) },
+          { text: t.breakOpen, onPress: () => setBreakStart(addDate) },
+          { text: t.cancel, style: 'cancel' },
+        ])} />
       </View>
       <BreakModal startDate={breakStart} onClose={() => setBreakStart(null)} onChanged={onChanged} />
       <MonthModal initialDate={monthStart} revision={revision} onClose={() => setMonthStart(null)}
@@ -97,7 +102,6 @@ export function AgendaScreen({ revision, onOpen, onAdd, onChanged }: AgendaScree
             <Text style={styles.emptyText}>{t.emptyBody}</Text>
             <Pressable accessibilityRole="button" accessibilityLabel={t.firstLesson} onPress={() => onAdd(addDate)} style={({ pressed }) => [styles.emptyButton, pressed && styles.pressed]}><Text style={styles.emptyButtonText}>{t.firstLesson}</Text></Pressable>
           </View>
-          <Text style={styles.retentionHint}>{t.offlineInfo}</Text>
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.agenda} showsVerticalScrollIndicator={false}>
@@ -109,7 +113,6 @@ export function AgendaScreen({ revision, onOpen, onAdd, onChanged }: AgendaScree
               ))}
             </View>
           ))}
-          <Text style={styles.retentionHint}>{t.offlineInfo}</Text>
         </ScrollView>
       )}
     </View>

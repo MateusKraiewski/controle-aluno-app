@@ -4,6 +4,7 @@ import { androidTopInset } from '../theme/insets';
 import { useSQLiteContext } from 'expo-sqlite';
 import { ErrorText } from '../components/ErrorText';
 import { Field } from '../components/Field';
+import { DatePickerField } from '../components/Pickers';
 import { ModalHeader } from '../components/ModalHeader';
 import { MAX_REASON_LENGTH, MAX_RECURRENCE_SPAN_DAYS, addDays, formatTemplate, validateDateRange } from '../features/lessons/domain';
 import type { DateRangeError } from '../features/lessons/domain';
@@ -69,8 +70,8 @@ function BreakBody({ startDate, onClose, onChanged }: { startDate: string; onClo
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <ModalHeader eyebrow={t.breakEyebrow} title={t.breakTitle} onClose={onClose} />
           <Text style={styles.info}>{t.breakCaption}</Text>
-          <Field label={t.breakFrom} value={from} onChangeText={setFrom} placeholder="2026-12-21" keyboardType="numbers-and-punctuation" maxLength={10} />
-          <Field label={t.breakTo} value={to} onChangeText={setTo} placeholder="2027-01-02" keyboardType="numbers-and-punctuation" maxLength={10} />
+          <DatePickerField label={t.breakFrom} value={from} onChange={setFrom} />
+          <DatePickerField label={t.breakTo} value={to} onChange={setTo} min={from} />
           <Field label={t.breakReason} value={reason} onChangeText={setReason} placeholder={t.breakReasonPlaceholder} maxLength={MAX_REASON_LENGTH} />
           <ErrorText message={error} />
           {!!message && <Text accessibilityLiveRegion="polite" style={[styles.info, { marginTop: 12 }]}>{message}</Text>}
