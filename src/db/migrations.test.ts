@@ -94,7 +94,7 @@ describe('migrations', () => {
     const { db, raw } = openTestDatabase();
     assert.equal(await migrate(db), SCHEMA_VERSION);
     const tables = raw.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all().map((row) => row.name);
-    assert.deepEqual(tables, ['attachment_trash', 'learning_objectives', 'lesson_attachments', 'lesson_objectives', 'lesson_series', 'lessons', 'lunch_days', 'subjects']);
+    assert.deepEqual(tables, ['attachment_trash', 'learning_objectives', 'lesson_attachments', 'lesson_objectives', 'lesson_series', 'lessons', 'lunch_choices', 'lunch_days', 'subjects']);
     // Idempotent on reopen.
     assert.equal(await migrate(db), SCHEMA_VERSION);
   });

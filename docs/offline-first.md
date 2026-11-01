@@ -47,7 +47,7 @@ erDiagram
 
 ### Migrações
 
-`src/db/migrations.ts` (sem dependências do Expo) aplica, numa única transação, os passos em falta até `SCHEMA_VERSION = 7` e grava `PRAGMA user_version` no fim; uma falha desfaz tudo e a versão anterior continua intacta. Os PRAGMAs de ligação (WAL, chaves estrangeiras, cache) correm antes, fora da transação, em `src/db/database.ts`.
+`src/db/migrations.ts` (sem dependências do Expo) aplica, numa única transação, os passos em falta até `SCHEMA_VERSION = 8` e grava `PRAGMA user_version` no fim; uma falha desfaz tudo e a versão anterior continua intacta. Os PRAGMAs de ligação (WAL, chaves estrangeiras, cache) correm antes, fora da transação, em `src/db/database.ts`.
 
 - **v1:** `subjects`, `lessons`, índices `lessons_date_time_idx` e `lessons_subject_date_idx`.
 - **v2 (aditiva):** cria `lesson_series`; `ALTER TABLE lessons ADD COLUMN` `status` (default `planned`, CHECK), `cancel_reason`, `series_id` (FK `ON DELETE SET NULL`), `original_local_date`, `updated_at`; `ALTER TABLE subjects ADD COLUMN archived_at`; índice parcial `lessons_series_date_idx (series_id, local_date) WHERE series_id IS NOT NULL`. Nenhuma linha existente é reescrita ou apagada; os defaults preenchem as aulas antigas.
@@ -153,7 +153,7 @@ As chaves são os nomes das colunas. Ficam de fora as colunas derivadas (`search
 
 **Limites conhecidos:** colar vários MB num `TextInput` pode ser lento ou ser cortado pela área de transferência; para cópias grandes, usar “Escolher ficheiro”. O seletor de ficheiros, a folha de partilha, o seletor de documentos dos anexos e `String.prototype.normalize` no Hermes ainda não foram ensaiados em aparelho.
 
-## Ementa do almoço (esquema v7)
+## Ementa do almoço (esquemas v7 e v8)
 
 O separador **Almoço** importa o PDF da ementa escolar e mostra um calendário mensal das refeições. Tudo corre no aparelho, sem internet nem serviços externos.
 
@@ -161,7 +161,8 @@ O separador **Almoço** importa o PDF da ementa escolar e mostra um calendário 
 - **Formato suportado:** `menu-parser.ts` foi feito para a ementa semanal do Município de Loures (fornecedor Uniself), com cabeçalho "Semana de DD a DD de mês de AAAA", um bloco por dia útil e as linhas Pequeno-almoço, Sopa, Prato geral, Prato vegetariano, Go 2 Go, Vegetais, Sobremesa e Lanche. "FERIADO" marca o dia como feriado. Os alérgenos e a tabela nutricional ficam de fora e continuam no PDF original. Outros formatos de ementa não são suportados.
 - **Importação:** só aceita PDF com até 10 MB e cabeçalho `%PDF-`. Antes de guardar, um alerta resume as semanas, os dias e os feriados. Guardar substitui as datas que já existiam e é feito numa transação (no máximo 400 dias por importação). A cópia temporária do seletor é apagada.
 - **Tabela:** `lunch_days(local_date PK, holiday, meals JSON, source_name, imported_at)`, criada pela migração v7.
-- **Cópia de segurança:** a ementa não entra na cópia JSON (o documento continua v5). Restaurar uma cópia mantém a ementa; "apagar todos os dados" também a apaga.
+- **Prato escolhido:** no cartão do dia, o aluno toca no prato geral, vegetariano ou Go 2 Go que escolheu (tocar de novo desmarca); o calendário mostra ✓ nesse dia. Fica em `lunch_choices(local_date PK, choice, chosen_at)` (migração v8), separada da ementa para que reimportar o mesmo período não apague a escolha.
+- **Cópia de segurança:** a ementa não entra na cópia JSON (o documento continua v5). Restaurar uma cópia mantém a ementa e as escolhas; "apagar todos os dados" apaga as duas.
 
 ## Guardrails de crescimento
 

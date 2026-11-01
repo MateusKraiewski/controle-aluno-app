@@ -6,7 +6,7 @@ import { ErrorText } from '../components/ErrorText';
 import { addMonths, formatTemplate, monthGrid, toLocalDate } from '../features/lessons/domain';
 import { pickLunchMenu } from '../features/lunch/import';
 import { MEAL_ORDER, type MealKey } from '../features/lunch/menu-parser';
-import { listLunchDays, saveLunchMenu, type StoredLunchDay } from '../features/lunch/repository';
+import { LUNCH_CHOICES, listLunchDays, saveLunchMenu, setLunchChoice, type LunchChoice, type StoredLunchDay } from '../features/lunch/repository';
 import { longDate, monthLabel } from '../lib/format';
 import { weekdayLabel, type TranslationKey } from '../lib/locales';
 import { useApp } from '../theme/AppContext';
@@ -76,6 +76,20 @@ export function LunchScreen({ revision, onChanged }: { revision: number; onChang
     } finally { setBusy(false); }
   }
 
+  // Optimistic: the card updates at once and reloads from the database if saving fails.
+  async function choose(date: string, choice: LunchChoice | null) {
+    setDays((current) => {
+      const entry = current.get(date);
+      return entry ? new Map(current).set(date, { ...entry, choice }) : current;
+    });
+    try {
+      await setLunchChoice(db, date, choice);
+    } catch {
+      setError(t.lunchChoiceError);
+      onChanged();
+    }
+  }
+
   const weeks: string[][] = [];
   for (let index = 0; index < grid.days.length; index += 7) weeks.push(grid.days.slice(index, index + 7));
   const day = days.get(selected);
@@ -106,8 +120,9 @@ export function LunchScreen({ revision, onChanged }: { revision: number; onChang
           {week.map((date) => {
             const entry = days.get(date);
             const inMonth = date.slice(0, 7) === month.slice(0, 7);
-            const mark = entry ? (entry.holiday ? t.lunchHolidayShort : '•') : ' ';
-            const label = [longDate(date, language), entry ? (entry.holiday ? t.lunchHoliday : entry.meals.main ?? t.lunchHasMenu) : t.lunchNoMenuDay, date === today ? t.today : null].filter(Boolean).join(', ');
+            const mark = entry ? (entry.holiday ? t.lunchHolidayShort : entry.choice ? '✓' : '•') : ' ';
+            const dish = entry?.choice ? `${t.lunchChosen}: ${entry.meals[entry.choice] ?? ''}` : entry?.meals.main ?? t.lunchHasMenu;
+            const label = [longDate(date, language), entry ? (entry.holiday ? t.lunchHoliday : dish) : t.lunchNoMenuDay, date === today ? t.today : null].filter(Boolean).join(', ');
             return (
               <Pressable key={date} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: date === selected }} onPress={() => setSelected(date)}
                 style={({ pressed }) => [styles.monthCell, date === today && styles.monthToday, date === selected && styles.chipSelected, pressed && styles.pressed]}>
@@ -123,12 +138,26 @@ export function LunchScreen({ revision, onChanged }: { revision: number; onChang
         <Text accessibilityRole="header" style={styles.lessonSubject}>{longDate(selected, language)}{selected === today ? ` · ${t.today}` : ''}</Text>
         {!day && <Text style={styles.lessonNote}>{t.lunchNoMenuDay}</Text>}
         {day?.holiday && <Text style={styles.lessonNote}>{t.lunchHoliday}</Text>}
-        {day && !day.holiday && MEAL_ORDER.filter((key) => day.meals[key]).map((key) => (
-          <View key={key} style={{ marginTop: 10 }}>
-            <Text style={styles.sectionEyebrow}>{t[MEAL_LABELS[key]].toUpperCase()}</Text>
-            <Text style={[styles.lessonNote, { marginTop: 3, color: palette.ink, fontSize: key === 'main' ? 15 : 13, fontWeight: key === 'main' ? '700' : '400' }]}>{day.meals[key]}</Text>
-          </View>
-        ))}
+        {day && !day.holiday && LUNCH_CHOICES.some((key) => day.meals[key]) && <Text style={[styles.lessonNote, { marginTop: 8 }]}>{t.lunchChooseHint}</Text>}
+        {day && !day.holiday && MEAL_ORDER.filter((key) => day.meals[key]).map((key) => {
+          const choosable = (LUNCH_CHOICES as readonly MealKey[]).includes(key);
+          const chosen = day.choice === key;
+          const content = (
+            <>
+              <Text style={[styles.sectionEyebrow, chosen && styles.chipTextSelected]}>{t[MEAL_LABELS[key]].toUpperCase()}{chosen ? ` · ✓ ${t.lunchChosen.toUpperCase()}` : ''}</Text>
+              <Text style={[styles.lessonNote, { marginTop: 3, color: palette.ink, fontSize: choosable ? 15 : 13, fontWeight: choosable ? '700' : '400' }, chosen && styles.chipTextSelected]}>{day.meals[key]}</Text>
+            </>
+          );
+          if (!choosable) return <View key={key} style={{ marginTop: 10 }}>{content}</View>;
+          return (
+            <Pressable key={key} accessibilityRole="radio" accessibilityState={{ checked: chosen }}
+              accessibilityLabel={`${t[MEAL_LABELS[key]]}: ${day.meals[key]}`} accessibilityHint={chosen ? t.lunchUnchooseHint : undefined}
+              onPress={() => { void choose(day.date, chosen ? null : key as LunchChoice); }}
+              style={({ pressed }) => [styles.chip, { marginTop: 10, borderRadius: 14, paddingVertical: 10, alignItems: 'flex-start' }, chosen && styles.chipSelected, pressed && styles.pressed]}>
+              {content}
+            </Pressable>
+          );
+        })}
       </View>
       <Text style={[styles.info, { marginTop: 10 }]}>{t.lunchPrivacy}</Text>
     </ScrollView>

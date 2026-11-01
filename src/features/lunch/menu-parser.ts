@@ -30,14 +30,16 @@ function addDays(date: string, days: number) {
 
 /** "Semana de 05 a 09 de outubro de 2026", "Semana 12 a 16 de outubro de 2026", "28 de setembro a 2 de outubro de 2026". */
 export function parseWeekHeader(text: string) {
-  const match = /(\d{1,2})(?:\s+de\s+([a-zçã]+))?\s+a\s+(\d{1,2})\s+de\s+([a-zçã]+)\s+de\s+(\d{4})/i.exec(text);
+  // "05 a 09 de outubro de 2026", "02 a 06 de novembro 2026" (no "de" before the year)
+  // and "28 de dezembro de 2026 a 01 de janeiro de 2027" (start month and year spelled out).
+  const match = /(\d{1,2})(?:\s+de\s+([a-zçã]+)(?:\s+(?:de\s+)?(\d{4}))?)?\s+a\s+(\d{1,2})\s+de\s+([a-zçã]+)\s+(?:de\s+)?(\d{4})/i.exec(text);
   if (!match) return null;
-  const endMonth = months[match[4]!.toLowerCase()];
+  const endMonth = months[match[5]!.toLowerCase()];
   const startMonth = match[2] ? months[match[2].toLowerCase()] : endMonth;
   if (!endMonth || !startMonth) return null;
-  const year = Number(match[5]);
-  const startYear = startMonth > endMonth ? year - 1 : year;
-  return { start: iso(startYear, startMonth, Number(match[1])), end: iso(year, endMonth, Number(match[3])) };
+  const year = Number(match[6]);
+  const startYear = match[3] ? Number(match[3]) : startMonth > endMonth ? year - 1 : year;
+  return { start: iso(startYear, startMonth, Number(match[1])), end: iso(year, endMonth, Number(match[4])) };
 }
 
 const categoryOf = (text: string) => categories.find(([pattern]) => pattern.test(text.replace(/\s+/g, ' ').trim()))?.[1] ?? null;

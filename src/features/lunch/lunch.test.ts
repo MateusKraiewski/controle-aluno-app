@@ -6,7 +6,7 @@ import { openTestDatabase } from '../../testing/nodeSqlite';
 import { parseSchoolMenu, parseWeekHeader } from './menu-parser';
 import type { TextItem } from './pdf-text';
 import { extractPdfText } from './pdf-text';
-import { deleteLunchDays, listLunchDays, saveLunchMenu } from './repository';
+import { deleteLunchDays, listLunchDays, saveLunchMenu, setLunchChoice } from './repository';
 
 const item = (y: number, x: number, text: string, width = text.length * 4): TextItem => ({ page: 1, x, y, width, text });
 
@@ -15,6 +15,8 @@ describe('school menu parser', () => {
     assert.deepEqual(parseWeekHeader('Semana de 05 a 09 de outubro de 2026'), { start: '2026-10-05', end: '2026-10-09' });
     assert.deepEqual(parseWeekHeader('Semana 12 a 16 de outubro de 2026'), { start: '2026-10-12', end: '2026-10-16' });
     assert.deepEqual(parseWeekHeader('Semana de 28 de dezembro a 1 de janeiro de 2027'), { start: '2026-12-28', end: '2027-01-01' });
+    assert.deepEqual(parseWeekHeader('Semana de 02 a 06 de novembro 2026'), { start: '2026-11-02', end: '2026-11-06' });
+    assert.deepEqual(parseWeekHeader('Semana de 28 de dezembro de 2026 a 01 de janeiro de 2027'), { start: '2026-12-28', end: '2027-01-01' });
     assert.equal(parseWeekHeader('Município de Loures'), null);
   });
 
@@ -61,11 +63,23 @@ describe('lunch repository', () => {
     await saveLunchMenu(db, [{ date: '2026-10-06', holiday: false, meals: { soup: 'Sopa B' } }], 'nova.pdf', 2);
     const listed = await listLunchDays(db, '2026-10-01', '2026-10-31');
     assert.deepEqual(listed, [
-      { date: '2026-10-05', holiday: true, meals: {}, sourceName: 'ementa.pdf' },
-      { date: '2026-10-06', holiday: false, meals: { soup: 'Sopa B' }, sourceName: 'nova.pdf' },
+      { date: '2026-10-05', holiday: true, meals: {}, sourceName: 'ementa.pdf', choice: null },
+      { date: '2026-10-06', holiday: false, meals: { soup: 'Sopa B' }, sourceName: 'nova.pdf', choice: null },
     ]);
     await deleteLunchDays(db, '2026-10-05', '2026-10-05');
     assert.equal((await listLunchDays(db, '2026-10-01', '2026-10-31')).length, 1);
     await assert.rejects(saveLunchMenu(db, [], null));
+  });
+
+  it('keeps the chosen dish across a re-import and clears it on request', async () => {
+    const { db } = openTestDatabase();
+    await migrate(db);
+    await saveLunchMenu(db, [{ date: '2026-11-09', holiday: false, meals: { main: 'Empadão', vegetarian: 'Soja' } }], 'novembro.pdf', 1);
+    await setLunchChoice(db, '2026-11-09', 'vegetarian', 2);
+    await saveLunchMenu(db, [{ date: '2026-11-09', holiday: false, meals: { main: 'Peixe', vegetarian: 'Soja' } }], 'novembro-v2.pdf', 3);
+    assert.equal((await listLunchDays(db, '2026-11-09', '2026-11-09'))[0]!.choice, 'vegetarian');
+    await setLunchChoice(db, '2026-11-09', null);
+    assert.equal((await listLunchDays(db, '2026-11-09', '2026-11-09'))[0]!.choice, null);
+    await assert.rejects(setLunchChoice(db, '2026-11-09', 'dessert' as never));
   });
 });
