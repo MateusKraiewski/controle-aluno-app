@@ -173,6 +173,13 @@ No fim de cada aula o app mostra uma notificação local a pedir as anotações 
 - **Definições:** secção "Lembretes de anotações" (ligados por omissão, guardado em `expo-sqlite/kv-store`), aviso se o Android bloquear as notificações e botão para testar. A permissão do Android 13+ é pedida no primeiro arranque com os lembretes ligados.
 - **Limites:** sem a permissão de alarmes exatos o Android pode atrasar alguns minutos; se o app não for aberto durante mais de 8 dias, os lembretes acabam até à próxima abertura.
 
+## Reportar dia (PDF para partilhar)
+
+Quando todas as aulas de um dia (hoje ou anterior) que aconteceram têm anotações, a agenda mostra o botão **📄 Reportar dia** por baixo desse dia. As canceladas e as marcadas como falta não precisam de anotações, mas aparecem no relatório.
+
+- `src/features/report/domain.ts` (puro, testado) decide se o dia está pronto e gera o HTML (texto escapado, sem recursos externos). Os apontamentos privados nunca entram no PDF.
+- `files.ts` converte o HTML em PDF no aparelho (`expo-print`), guarda-o em `cache/day-report/` (só o último) e abre a partilha do sistema, onde se escolhe o WhatsApp.
+
 ## Guardrails de crescimento
 
 - Não usar `SELECT *`, resultados sem limite ou consultas por item em loop.

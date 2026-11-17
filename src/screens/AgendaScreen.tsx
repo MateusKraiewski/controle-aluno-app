@@ -4,10 +4,12 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { Chip } from '../components/Chip';
 import { ErrorText } from '../components/ErrorText';
 import { LessonCard } from '../components/LessonCard';
-import { addDays, startOfWeek, toLocalDate } from '../features/lessons/domain';
+import { addDays, formatTemplate, startOfWeek, toLocalDate } from '../features/lessons/domain';
+import { buildDayReportHtml, isDayReady } from '../features/report/domain';
+import { shareDayReportPdf } from '../features/report/files';
 import { listLessonsInRange, updateAttendance } from '../features/lessons/repository';
 import type { Attendance, Lesson } from '../features/lessons/types';
-import { prettyDate, weekLabel } from '../lib/format';
+import { dateTime, prettyDate, weekLabel } from '../lib/format';
 import { useApp } from '../theme/AppContext';
 import { BreakModal } from './BreakModal';
 import { MonthModal } from './MonthModal';
@@ -64,6 +66,29 @@ export function AgendaScreen({ revision, onOpen, onAdd, onChanged }: AgendaScree
     }
   }, [db, onChanged, t.attendanceError]);
 
+  const [reporting, setReporting] = useState<string | null>(null);
+  async function reportDay(day: string, dayLessons: Lesson[]) {
+    setReporting(day);
+    setError('');
+    try {
+      const taken = dayLessons.filter((lesson) => lesson.status === 'planned');
+      const attended = taken.filter((lesson) => lesson.attendance === 'attended').length;
+      const absent = taken.filter((lesson) => lesson.attendance === 'absent').length;
+      const html = buildDayReportHtml(dayLessons, {
+        title: t.reportTitle, dateLine: prettyDate(day, language),
+        summary: formatTemplate(taken.length === 1 ? t.reportSummaryOne : t.reportSummary, { count: taken.length, attended, absent }),
+        generated: formatTemplate(t.reportGenerated, { date: dateTime(new Date().toISOString(), language) }),
+        teacher: t.reportTeacher, studied: t.reportStudied, nextStep: t.reportNextStep, planned: t.reportPlanned, onlyPrivate: t.reportOnlyPrivate,
+        attended: t.reportAttended, absent: t.reportAbsent, unmarked: t.reportUnmarked, cancelled: t.cancelled,
+      });
+      if (await shareDayReportPdf(html, `${t.reportFilePrefix}-${day}.pdf`, t.reportShareTitle) === 'unavailable') setError(t.reportUnavailable);
+    } catch {
+      setError(t.reportError);
+    } finally {
+      setReporting(null);
+    }
+  }
+
   const isCurrentWeek = weekStart === currentWeek;
   const addDate = isCurrentWeek ? today : weekStart;
 
@@ -111,6 +136,13 @@ export function AgendaScreen({ revision, onOpen, onAdd, onChanged }: AgendaScree
               {dayLessons.map((lesson, index) => (
                 <LessonCard key={lesson.id} lesson={lesson} accentIndex={index} onOpen={onOpen} onAttendance={markAttendance} />
               ))}
+              {isDayReady(dayLessons, day, today) && (
+                <Pressable accessibilityRole="button" accessibilityHint={t.reportDayHint} accessibilityState={{ busy: reporting === day, disabled: reporting !== null }}
+                  disabled={reporting !== null} onPress={() => void reportDay(day, dayLessons)}
+                  style={({ pressed }) => [styles.secondaryButton, { marginTop: 4, marginBottom: 8 }, pressed && styles.pressed, reporting !== null && styles.disabled]}>
+                  <Text style={styles.secondaryButtonText}>{reporting === day ? t.reportBusy : t.reportDay}</Text>
+                </Pressable>
+              )}
             </View>
           ))}
         </ScrollView>
