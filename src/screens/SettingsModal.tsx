@@ -3,6 +3,8 @@ import { androidTopInset } from '../theme/insets';
 import { ModalHeader } from '../components/ModalHeader';
 import { DataSettings } from './DataSettings';
 import { ReminderSettings } from './ReminderSettings';
+import { ScreenTimeModal } from './ScreenTimeModal';
+import { useState } from 'react';
 import type { Language, ThemePreference } from '../lib/preferences';
 import { useApp } from '../theme/AppContext';
 
@@ -22,12 +24,18 @@ type SettingsModalProps = {
 
 export function SettingsModal({ visible, themePreference, onClose, onLanguage, onTheme, onDataChanged, remindersEnabled, onReminders }: SettingsModalProps) {
   const { styles, t, language, modalAnimation } = useApp();
+  const [screenTime, setScreenTime] = useState(false);
   const themes: [ThemePreference, string][] = [['system', t.system], ['light', t.light], ['dark', t.dark]];
   return (
     <Modal visible={visible} animationType={modalAnimation} presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={[styles.modalSafe, { paddingTop: androidTopInset }]} accessibilityViewIsModal>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <ModalHeader eyebrow={t.settings} title={t.settings} onClose={onClose} />
+          <Pressable accessibilityRole="button" accessibilityHint={t.screenMenuHint} onPress={() => setScreenTime(true)}
+            style={({ pressed }) => [styles.secondaryButton, { marginBottom: 6 }, pressed && styles.pressed]}>
+            <Text style={styles.secondaryButtonText}>{t.screenMenu}</Text>
+          </Pressable>
+          <Text style={styles.info}>{t.screenMenuHint}</Text>
           <Text accessibilityRole="header" style={styles.fieldLabel}>{t.language}</Text>
           <View accessibilityRole="radiogroup" accessibilityLabel={t.language}>
             {LANGUAGES.map(([value, label]) => (
@@ -49,6 +57,7 @@ export function SettingsModal({ visible, themePreference, onClose, onLanguage, o
           <ReminderSettings enabled={remindersEnabled} onEnabled={onReminders} visible={visible} />
           <DataSettings onChanged={onDataChanged} />
         </ScrollView>
+        <ScreenTimeModal visible={screenTime} onClose={() => setScreenTime(false)} />
       </SafeAreaView>
     </Modal>
   );

@@ -180,6 +180,15 @@ Quando todas as aulas de um dia (hoje ou anterior) que aconteceram têm anotaç�
 - `src/features/report/domain.ts` (puro, testado) decide se o dia está pronto e gera o HTML (texto escapado, sem recursos externos). Os apontamentos privados nunca entram no PDF.
 - `files.ts` converte o HTML em PDF no aparelho (`expo-print`), guarda-o em `cache/day-report/` (só o último) e abre a partilha do sistema, onde se escolhe o WhatsApp.
 
+## Tempo de ecrã (Android)
+
+Em ⚙ › "📱 Tempo de ecrã" o app mostra o uso de todas as apps do telemóvel, como o Bem-estar digital: total e desbloqueios do dia, barras dos últimos 7 dias (tocar num dia mostra esse dia) e a lista das apps com tempo e aberturas.
+
+- Módulo nativo local `modules/screen-time` (Kotlin, ligado pelo autolinking do Expo) lê os eventos do `UsageStatsManager` (`ACTIVITY_RESUMED/PAUSED`, ecrã desligado, `KEYGUARD_HIDDEN` para desbloqueios). O launcher fica de fora. Ícones são desenhados a 96 px e passados como data URI.
+- Exige a autorização especial "Acesso de utilização" (`PACKAGE_USAGE_STATS`), dada pelo utilizador nas definições do Android; o ecrã tem um botão para lá. `QUERY_ALL_PACKAGES` serve para mostrar nomes e ícones (app instalada por APK, não pela loja).
+- Nada é guardado no SQLite nem enviado: cada abertura do ecrã volta a ler do Android, que guarda só alguns dias de eventos.
+- Regras puras em `src/features/screenTime/domain.ts`; ponte em `native.ts` (devolve vazio fora do Android).
+
 ## Guardrails de crescimento
 
 - Não usar `SELECT *`, resultados sem limite ou consultas por item em loop.
