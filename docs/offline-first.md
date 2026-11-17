@@ -164,6 +164,15 @@ O separador **Almoço** importa o PDF da ementa escolar e mostra um calendário 
 - **Prato escolhido:** no cartão do dia, o aluno toca no prato geral, vegetariano ou Go 2 Go que escolheu (tocar de novo desmarca); o calendário mostra ✓ nesse dia. Fica em `lunch_choices(local_date PK, choice, chosen_at)` (migração v8), separada da ementa para que reimportar o mesmo período não apague a escolha.
 - **Cópia de segurança:** a ementa não entra na cópia JSON (o documento continua v5). Restaurar uma cópia mantém a ementa e as escolhas; "apagar todos os dados" apaga as duas.
 
+## Lembretes de anotações (notificações locais)
+
+No fim de cada aula o app mostra uma notificação local a pedir as anotações e, se ficarem por fazer, insiste com mensagens cada vez mais dramáticas (estilo Duolingo). Sem servidor, sem internet e sem alterações ao esquema SQLite.
+
+- **Regras (`src/features/reminders/domain.ts`, puro e testado):** uma aula precisa de anotações quando está `planned`, não foi marcada como falta e não tem "o que estudei", "próximo passo" nem notas privadas. Aulas canceladas por feriado/interrupção (o modal de pausa cancela-as) ficam de fora. Níveis em minutos após o fim: 0, 45, 120, 240, 480, 1440 e 2880; depois do último o app desiste dessa aula. Um lembrete que caia durante outra aula passa para o fim dessa aula; entre as 21:30 e as 07:30 (09:30 ao fim de semana) passa para a manhã; lembretes a menos de 10 min juntam-se num só (vence a aula mais atrasada e o nível mais alto, com "e há mais N aulas à espera").
+- **Agendamento (`notifications.ts`, `expo-notifications`):** cada sincronização cancela tudo e volta a planear a partir da base local (aulas de 3 dias atrás a 8 dias à frente, no máximo 60 notificações). Corre depois de cada escrita (revisão do `App.tsx`) e quando o app volta à frente; notificações já mostradas de aulas entretanto preenchidas são retiradas. Tocar num lembrete abre a aula no editor.
+- **Definições:** secção "Lembretes de anotações" (ligados por omissão, guardado em `expo-sqlite/kv-store`), aviso se o Android bloquear as notificações e botão para testar. A permissão do Android 13+ é pedida no primeiro arranque com os lembretes ligados.
+- **Limites:** sem a permissão de alarmes exatos o Android pode atrasar alguns minutos; se o app não for aberto durante mais de 8 dias, os lembretes acabam até à próxima abertura.
+
 ## Guardrails de crescimento
 
 - Não usar `SELECT *`, resultados sem limite ou consultas por item em loop.
