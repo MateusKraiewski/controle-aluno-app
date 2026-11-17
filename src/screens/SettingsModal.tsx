@@ -2,6 +2,7 @@ import { Modal, Pressable, ScrollView, Text, View, SafeAreaView } from 'react-na
 import { androidTopInset } from '../theme/insets';
 import { ModalHeader } from '../components/ModalHeader';
 import { DataSettings } from './DataSettings';
+import { ReminderSettings } from './ReminderSettings';
 import type { Language, ThemePreference } from '../lib/preferences';
 import { useApp } from '../theme/AppContext';
 
@@ -15,9 +16,11 @@ type SettingsModalProps = {
   onTheme: (theme: ThemePreference) => void;
   /** Called after a restore or erase so visible screens re-read local data. */
   onDataChanged: () => void;
+  remindersEnabled: boolean;
+  onReminders: (enabled: boolean) => void;
 };
 
-export function SettingsModal({ visible, themePreference, onClose, onLanguage, onTheme, onDataChanged }: SettingsModalProps) {
+export function SettingsModal({ visible, themePreference, onClose, onLanguage, onTheme, onDataChanged, remindersEnabled, onReminders }: SettingsModalProps) {
   const { styles, t, language, modalAnimation } = useApp();
   const themes: [ThemePreference, string][] = [['system', t.system], ['light', t.light], ['dark', t.dark]];
   return (
@@ -43,6 +46,7 @@ export function SettingsModal({ visible, themePreference, onClose, onLanguage, o
               </Pressable>
             ))}
           </View>
+          <ReminderSettings enabled={remindersEnabled} onEnabled={onReminders} visible={visible} />
           <DataSettings onChanged={onDataChanged} />
         </ScrollView>
       </SafeAreaView>

@@ -29,3 +29,14 @@ function isLanguage(value: string | null): value is Language {
 function isTheme(value: string | null): value is ThemePreference {
   return value === 'system' || value === 'light' || value === 'dark';
 }
+
+const REMINDERS_KEY = 'aula-em-dia.lesson-reminders.v1';
+
+/** Lesson-notes reminders are on unless the student turned them off. */
+export async function loadRemindersEnabled(): Promise<boolean> {
+  return (await Storage.getItem(REMINDERS_KEY)) !== 'off';
+}
+
+export async function saveRemindersEnabled(enabled: boolean) {
+  await Storage.setItem(REMINDERS_KEY, enabled ? 'on' : 'off');
+}

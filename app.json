@@ -25,7 +25,8 @@
     "plugins": [
       "expo-sqlite",
       "expo-system-ui",
-      "expo-sharing"
+      "expo-sharing",
+      ["expo-notifications", { "icon": "./assets/android-icon-monochrome.png", "color": "#243d34" }]
     ]
   }
 }

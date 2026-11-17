@@ -1,15 +1,17 @@
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AccessibilityInfo, Pressable, Text, View, useColorScheme } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, AppState, Pressable, Text, View, useColorScheme } from 'react-native';
+import { useLastNotificationResponse } from 'expo-notifications';
 import { androidTopInset } from './src/theme/insets';
-import { SQLiteProvider } from 'expo-sqlite';
+import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
 import { TabBar } from './src/components/TabBar';
 import type { TabKey } from './src/components/TabBar';
 import { ErrorText } from './src/components/ErrorText';
 import { initializeDatabase } from './src/db/database';
 import type { Lesson } from './src/features/lessons/types';
 import { getTranslations } from './src/lib/locales';
-import { loadPreferences, saveLanguage, saveTheme } from './src/lib/preferences';
+import { loadPreferences, loadRemindersEnabled, saveLanguage, saveRemindersEnabled, saveTheme } from './src/lib/preferences';
+import { getReminderPermission, installReminderHandler, lessonIdFromResponse, requestReminderPermission, syncReminders } from './src/features/reminders/notifications';
 import type { Language, ThemePreference } from './src/lib/preferences';
 import { AgendaScreen } from './src/screens/AgendaScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
@@ -22,7 +24,10 @@ import { AppContextProvider } from './src/theme/AppContext';
 import { darkPalette, lightPalette } from './src/theme/palette';
 import { createStyles } from './src/theme/styles';
 
+installReminderHandler();
+
 function AppShell() {
+  const db = useSQLiteContext();
   const systemScheme = useColorScheme();
   const [language, setLanguage] = useState<Language>('pt-BR');
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
@@ -33,6 +38,12 @@ function AppShell() {
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState('');
   const [reduceMotion, setReduceMotion] = useState(false);
+  // null until the saved preference is read, so reminders are never cleared by mistake on start.
+  const [remindersEnabled, setRemindersEnabled] = useState<boolean | null>(null);
+  // Bumped when the app comes back to the front, so reminders are replanned for "now".
+  const [foreground, setForeground] = useState(0);
+  const lastResponse = useLastNotificationResponse();
+  const handledResponse = useRef<string | null>(null);
   const isDark = themePreference === 'dark' || (themePreference === 'system' && systemScheme === 'dark');
   const context = useMemo(() => {
     const palette = isDark ? darkPalette : lightPalette;
@@ -54,6 +65,38 @@ function AppShell() {
     return () => subscription.remove();
   }, []);
 
+  useEffect(() => {
+    loadRemindersEnabled().then(setRemindersEnabled).catch(() => setRemindersEnabled(true));
+    const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') setForeground((value) => value + 1); });
+    return () => subscription.remove();
+  }, []);
+
+  // First run with reminders on: ask Android 13+ for the notification permission once.
+  useEffect(() => {
+    if (!remindersEnabled) return;
+    getReminderPermission().then((permission) => {
+      if (permission === 'undetermined') return requestReminderPermission(t).then(() => setForeground((value) => value + 1));
+    }).catch(() => undefined);
+    // Asked when the switch turns on, not again on language changes.
+  }, [remindersEnabled]);
+
+  // Every write (notes saved, lesson cancelled, holiday added…) replans the reminders, shortly after.
+  useEffect(() => {
+    if (remindersEnabled === null) return;
+    const timer = setTimeout(() => { syncReminders(db, t, remindersEnabled).catch(() => undefined); }, 600);
+    return () => clearTimeout(timer);
+  }, [db, t, remindersEnabled, revision, foreground]);
+
+  // Tapping a reminder opens the lesson it talks about.
+  useEffect(() => {
+    if (!lastResponse) return;
+    const id = lastResponse.notification.request.identifier;
+    if (handledResponse.current === id) return;
+    handledResponse.current = id;
+    const lessonId = lessonIdFromResponse(lastResponse);
+    if (lessonId !== null) setEditor({ mode: 'edit', id: lessonId });
+  }, [lastResponse]);
+
   const changed = useCallback(() => setRevision((value) => value + 1), []);
   const openLesson = useCallback((lesson: Lesson) => setEditor({ mode: 'edit', id: lesson.id }), []);
   const addLesson = useCallback((localDate: string) => setEditor({ mode: 'create', localDate }), []);
@@ -62,6 +105,10 @@ function AppShell() {
   async function changeLanguage(next: Language) {
     setLanguage(next);
     try { await saveLanguage(next); } catch { setError(getTranslations(next).saveError); }
+  }
+  async function changeReminders(next: boolean) {
+    setRemindersEnabled(next);
+    try { await saveRemindersEnabled(next); } catch { setError(t.saveError); }
   }
   async function changeTheme(next: ThemePreference) {
     setThemePreference(next);
@@ -100,6 +147,8 @@ function AppShell() {
           onLanguage={(next) => void changeLanguage(next)}
           onTheme={(next) => void changeTheme(next)}
           onDataChanged={changed}
+          remindersEnabled={remindersEnabled ?? true}
+          onReminders={(next) => void changeReminders(next)}
         />
       </View>
     </AppContextProvider>
